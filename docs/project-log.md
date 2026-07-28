@@ -6,6 +6,91 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 2, slice 4: the bot archetypes, and the scales to weigh them
+
+The table has real opponents. Four of the PRD's named archetypes play the felt,
+and a simulation harness measures them rather than taking their word for it.
+
+| File | What |
+| --- | --- |
+| `src/engine/archetypes.ts` | `BotProfile`, `makeBot`, and the Rock, Calling Station, Maniac and TAG |
+| `src/engine/simulate.ts` | `simulateMatch`: N seeded hands, chips counted in bb/100 |
+| `src/engine/bots.ts` | gained `bySeat`, which makes a table of personalities one policy |
+| `src/engine/potOdds.ts` | gained `potRaiseTo`, now shared by the bots and the bet sizer |
+
+384 tests passing, up from 364. Typecheck and lint clean. No new dependencies.
+
+### Decisions worth knowing about
+
+**Thresholds are in *even shares* of the pot, not raw equity.** A bot's `entry`
+and `raiseAt` are multiples of `1 / (players + 1)`, so 1.0 always means "an
+average hand for this table". Raw equity cannot do that job: 30% is a monster
+against five opponents and a fold heads-up, so any fixed equity threshold plays
+one table size correctly and every other one wrong.
+
+**The archetypes are measured on how they play, not on whether they win.** The
+tests assert the ordering the names promise — the Rock enters fewest pots, the
+Maniac most, the Station raises almost never — because that is what the archetype
+*is*. A personality is a distribution, so it is counted over a seeded run rather
+than asserted spot by spot.
+
+**A Maniac beating a table of calling stations is not a bug.** It looks wrong
+until you notice always-call is maximally exploitable by aggression: it never
+folds, so every value bet gets paid, and it never raises, so nothing punishes the
+bluffs. The PRD's criterion is that the baseline *loses* to a Medium bot, and
+both the TAG and the Rock take chips off it comfortably.
+
+**The 100k-hand run is opt-in, not part of the suite.** `POKER_LONG_SIM=1`
+switches it on. The PRD wants that sample before it believes a bot; the engine
+suite has to stay fast enough to leave running while editing, and it already grew
+from 3s to 5s absorbing the short version.
+
+**Rebuys stay on during measurement, and chips are counted per hand.** Measuring
+a win rate and measuring who survives are different questions; letting a seat
+bust out makes a short stack look like a bad bot. The consequence is that the
+session total *does* move — a rebuy adds chips on purpose — so conservation is
+asserted within a hand, never across the run.
+
+**`potRaiseTo` moved into the engine and the bet sizer now calls it.** The bots
+size their bets the same way the player's presets do, which is one implementation
+of a piece of poker arithmetic that is easy to get wrong — and the exact numbers
+are pinned in the engine's tests, where they do not shift every time a bot's
+personality is tuned.
+
+### Traps that cost real time
+
+**Wiring real bots in broke four UI tests, all correctly.** The old tests were
+written against a table of calling stations, and encoded that: ten face-down
+cards (now the archetypes fold and a folded seat has no cards), a pot of 45 (now
+the pot depends on who came along). The fix was to stop asserting arithmetic in
+screen tests — that belongs in `potOdds.test.ts` — and assert the wiring instead:
+the presets are ordered, and none of them can leave the legal band.
+
+**Folding around is chip-neutral only over a *whole* orbit.** A three-handed test
+over 40 hands is 13 orbits and one hand, and that spare hand is the small blind
+handing its blind to the big blind. This is the second time this exact fact has
+cost time; 39 hands, not 40.
+
+### Known gaps
+
+- **No Shark.** It needs range modelling and the mixed strategies above this
+  layer, which is the next slice's work. The PRD's tier ladder cannot be tested
+  properly until there is more than one tier.
+- **The bots cannot see the players they are facing.** Every opponent is a random
+  hand to them — no range narrowing, no history, no exploitation.
+- **Their names do not say what they are.** Learning to spot a Calling Station is
+  the point, so the labels belong in the table-configuration slice alongside
+  choosing the mix.
+- **`voluntary` counts actions, not hands**, so it overstates VPIP for a seat that
+  calls twice in one hand. Good enough to rank archetypes, not to publish.
+
+### Next
+
+Slice 5: range modelling and the Shark — narrowing each opponent to a range from
+their actions, and mixed frequencies on top of it.
+
+---
+
 ## 2026-07-29 — Phase 2, slice 3: the hero plays
 
 The table is live. The hero folds, calls, bets and raises for real, against five

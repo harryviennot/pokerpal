@@ -2,6 +2,7 @@ import { Host, Slider } from '@expo/ui';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
+import { potRaiseTo } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
@@ -46,7 +47,7 @@ export function BetSizer({ min, max, value, pot, toCall, committed, onChange }: 
             key={preset.label}
             label={preset.label}
             onPress={() =>
-              onChange(clamp(potFraction(preset.fraction, pot, toCall, committed), min, max))
+              onChange(clamp(potRaiseTo(preset.fraction, pot, toCall, committed), min, max))
             }
           />
         ))}
@@ -97,18 +98,6 @@ function Preset({ label, onPress }: PresetProps) {
       </Text>
     </Pressable>
   );
-}
-
-/**
- * The total commitment that raises by `fraction` of the pot.
- *
- * A pot-sized raise is not a bet of the pot: the raiser calls first, and the
- * pot they are raising has grown by that call. So the increment is a fraction
- * of `pot + toCall`, on top of the call itself. With nothing to call the two
- * definitions coincide and this is simply a bet of that fraction of the pot.
- */
-function potFraction(fraction: number, pot: number, toCall: number, committed: number): number {
-  return committed + toCall + Math.round(fraction * (pot + toCall));
 }
 
 function clamp(value: number, min: number, max: number): number {

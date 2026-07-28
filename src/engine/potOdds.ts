@@ -31,6 +31,22 @@ export class InvalidPotOddsError extends Error {
  * `pot` is the pot before hero calls but including the opponent's bet, which is
  * how a player reads it at the table.
  */
+/**
+ * The total street commitment that raises by `fraction` of the pot.
+ *
+ * A pot-sized raise is not a bet of the pot: the raiser calls first, and the pot
+ * they are raising has grown by that call. So the increment is a fraction of
+ * `pot + toCall`, on top of the call itself. With nothing to call the two
+ * definitions coincide, and this is simply a bet of that fraction of the pot.
+ *
+ * `pot` includes every chip wagered so far, the raiser's own included, and the
+ * result is a total street commitment — the `to` an `Action` carries. Callers
+ * must still clamp it into the band `legalActions` gave them.
+ */
+export function potRaiseTo(fraction: number, pot: number, toCall: number, committed = 0): number {
+  return committed + toCall + Math.round(fraction * (pot + toCall));
+}
+
 export function requiredEquity(pot: number, toCall: number): number {
   if (!Number.isFinite(pot) || pot < 0) {
     throw new InvalidPotOddsError(`Pot must be a non-negative number, got ${pot}.`);

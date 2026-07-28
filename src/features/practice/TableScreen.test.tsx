@@ -1,5 +1,7 @@
 import { cleanup, render, screen, userEvent } from '@testing-library/react-native';
 
+import { legalActions } from '@/engine';
+
 import { TableScreen } from './TableScreen';
 import { usePracticeStore } from './usePracticeStore';
 
@@ -29,8 +31,14 @@ describe('TableScreen', () => {
     await render(<TableScreen />);
 
     expect(screen.getByLabelText('You, 1 000 behind')).toBeOnTheScreen();
-    expect(screen.getAllByLabelText('Face-down card')).toHaveLength(10);
     expect(screen.getByLabelText('Dealer button')).toBeOnTheScreen();
+
+    // Two cards per opponent still in the hand — the archetypes fold plenty
+    // preflop, and a folded seat has no cards to show face down.
+    const faceDown = screen.getAllByLabelText('Face-down card').length;
+
+    expect(faceDown).toBeGreaterThanOrEqual(2);
+    expect(faceDown % 2).toBe(0);
   });
 
   it('offers no controls the rules did not', async () => {
@@ -40,28 +48,46 @@ describe('TableScreen', () => {
     expect(screen.queryByLabelText('Check')).not.toBeOnTheScreen();
   });
 
-  it('opens the raise at the minimum and resizes from the presets', async () => {
-    const user = setupUser();
-
+  /**
+   * The arithmetic behind the presets is `potRaiseTo`, and it is pinned to exact
+   * numbers in the engine's own tests. What matters here is the wiring: that the
+   * presets are ordered, that they land on the button, and that none of them can
+   * leave the legal band however the bots happened to act.
+   */
+  it('opens the raise at the minimum the rules allow', async () => {
     await render(<TableScreen />);
 
-    expect(screen.getByLabelText('Raise to 20')).toBeOnTheScreen();
+    const raise = legalActions(usePracticeStore.getState().hand).find(
+      (action) => action.type === 'bet' || action.type === 'raise',
+    );
 
-    await user.press(screen.getByLabelText('Pot'));
-
-    // The pot is 45 — two blinds and three callers — and the hero owes 10. A
-    // pot-sized raise calls that 10 and raises the 55 behind it.
-    expect(screen.getByLabelText('Raise to 65')).toBeOnTheScreen();
+    expect(raise).toBeDefined();
+    expect(
+      screen.getByLabelText(`Raise to ${raise?.type === 'raise' ? raise.min : 0}`),
+    ).toBeOnTheScreen();
   });
 
-  it('sizes half pot off the pot the call has already grown', async () => {
+  it('sizes the presets in order and never outside the legal band', async () => {
     const user = setupUser();
 
     await render(<TableScreen />);
-    await user.press(screen.getByLabelText('½ pot'));
 
-    // 10 to call, then half of the 55 that leaves in the middle.
-    expect(screen.getByLabelText('Raise to 38')).toBeOnTheScreen();
+    const raise = legalActions(usePracticeStore.getState().hand).find(
+      (action) => action.type === 'raise',
+    );
+    const sizes: number[] = [];
+
+    for (const preset of ['½ pot', '¾ pot', 'Pot', 'All in']) {
+      await user.press(screen.getByLabelText(preset));
+
+      const label = screen.getByLabelText(/^Raise to /).props.accessibilityLabel as string;
+
+      sizes.push(Number(label.replace(/\D/g, '')));
+    }
+
+    expect(sizes).toEqual([...sizes].sort((a, b) => a - b));
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(raise?.min ?? 0);
+    expect(Math.max(...sizes)).toBe(raise?.max);
   });
 
   it('plays the hero decision and moves the hand on', async () => {

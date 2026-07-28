@@ -1,16 +1,22 @@
 import { create } from 'zustand';
 
 import {
-  alwaysCall,
   applyAction,
+  bySeat,
+  CALLING_STATION,
   createRng,
   finishHand,
   isLegalAction,
+  makeBot,
+  MANIAC,
   playUntilSeat,
+  ROCK,
   startNextHand,
   startSession,
+  TAG,
   type Action,
   type BotPolicy,
+  type BotProfile,
   type HandState,
   type Rng,
   type SeatIndex,
@@ -27,24 +33,43 @@ const STARTING_STACK = 1000;
 const BOT_SEED_OFFSET = 0x9e3779b9;
 
 /**
+ * Who sits in each seat, hero first.
+ *
+ * A spread of personalities rather than five copies of one, so a session shows
+ * the player what each type does to them: two solid opponents to lose to, a
+ * station to value bet, a maniac to trap, and a rock to steal from. Choosing
+ * the mix is the table-configuration slice.
+ */
+const TABLE: readonly { id: string; profile: BotProfile | null }[] = [
+  { id: 'You', profile: null },
+  { id: 'Ava', profile: TAG },
+  { id: 'Ben', profile: CALLING_STATION },
+  { id: 'Cleo', profile: ROCK },
+  { id: 'Dev', profile: MANIAC },
+  { id: 'Elle', profile: TAG },
+];
+
+/**
  * Six-handed, 5/10, rebuys on. A cash game that never ends is the right default
  * for practice: the player leaves when they want to, not when they bust.
  * Configuring any of this is a later slice.
  */
 const DEFAULT_CONFIG: SessionConfig = {
-  seats: [
-    { id: 'You', stack: STARTING_STACK },
-    { id: 'Ava', stack: STARTING_STACK },
-    { id: 'Ben', stack: STARTING_STACK },
-    { id: 'Cleo', stack: STARTING_STACK },
-    { id: 'Dev', stack: STARTING_STACK },
-    { id: 'Elle', stack: STARTING_STACK },
-  ],
+  seats: TABLE.map((seat) => ({ id: seat.id, stack: STARTING_STACK })),
   style: 'cash',
   levels: [{ smallBlind: 5, bigBlind: 10 }],
   rebuyTo: STARTING_STACK,
   seed: 20260728,
 };
+
+/**
+ * The table's policies, one per seat.
+ *
+ * The hero's seat gets a policy too — it is never consulted, because
+ * `playUntilSeat` stops on the hero, but a hole in the array would be a crash
+ * waiting for the first bug that lets the loop past them.
+ */
+const OPPONENTS: BotPolicy = bySeat(TABLE.map((seat) => makeBot(seat.profile ?? ROCK)));
 
 export interface PracticeState {
   session: SessionState;
@@ -52,10 +77,7 @@ export interface PracticeState {
   /** Stacks as they were when this hand was dealt, which replay needs. */
   handSeats: readonly { id: string; stack: number }[];
   heroSeat: SeatIndex;
-  /**
-   * What the other five seats do. A calling station until the archetypes land —
-   * deliberately the PRD's own baseline rather than an invented placeholder.
-   */
+  /** What the other five seats do — a spread of the named archetypes. */
   opponents: BotPolicy;
   /** Drawn from once per bot decision, so a session is reproducible from its seed. */
   botRng: Rng;
@@ -111,10 +133,10 @@ function deal(config: SessionConfig): Omit<PracticeState, 'act' | 'nextHand' | '
 
   return {
     session,
-    hand: playUntilSeat(hand, HERO_SEAT, alwaysCall, botRng),
+    hand: playUntilSeat(hand, HERO_SEAT, OPPONENTS, botRng),
     handSeats: seatsOf(session),
     heroSeat: HERO_SEAT,
-    opponents: alwaysCall,
+    opponents: OPPONENTS,
     botRng,
   };
 }

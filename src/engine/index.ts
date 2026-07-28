@@ -55,6 +55,7 @@ export {
 
 export {
   analyzePotOdds,
+  potRaiseTo,
   InvalidPotOddsError,
   requiredEquity,
   type CallVerdict,
@@ -154,4 +155,17 @@ export {
   type TableStyle,
 } from './session';
 
-export { alwaysCall, alwaysFold, playUntilSeat, type BotPolicy } from './bots';
+export { alwaysCall, alwaysFold, bySeat, playUntilSeat, type BotPolicy } from './bots';
+
+export {
+  ARCHETYPES,
+  CALLING_STATION,
+  MANIAC,
+  makeBot,
+  ROCK,
+  TAG,
+  type BotOptions,
+  type BotProfile,
+} from './archetypes';
+
+export { simulateMatch, type MatchConfig, type MatchResult } from './simulate';
