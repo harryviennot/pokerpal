@@ -52,6 +52,10 @@ module.exports = [
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
+      // `const Foo = {...}; type Foo = ...` is the idiomatic stand-in for a TS
+      // enum, and tsc already rejects genuine redeclarations.
+      '@typescript-eslint/no-redeclare': 'off',
+      'no-redeclare': 'off',
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
