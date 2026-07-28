@@ -6,6 +6,92 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 2, slice 3: the hero plays
+
+The table is live. The hero folds, calls, bets and raises for real, against five
+seats that call anything. Every hand is dealt, played and booked by the engine.
+
+| File | What |
+| --- | --- |
+| `src/engine/bots.ts` | `BotPolicy`, the always-call and always-fold baselines, `playUntilSeat` |
+| `src/features/practice/usePracticeStore.ts` | the session, the live hand, the hero's decision |
+| `src/features/practice/ActionBar.tsx` | fold / check / call / bet / raise, built from `legalActions` |
+| `src/features/practice/BetSizer.tsx` | native slider and pot-fraction presets |
+| `src/features/practice/HandResult.tsx` | what the hand paid, and the next one |
+| `src/features/practice/useHandReplay.ts` | grew a cursor that follows a growing log |
+
+364 tests passing, up from 344. Typecheck and lint clean. No new dependencies —
+the slider is `@expo/ui`, which was already installed.
+
+### Decisions worth knowing about
+
+**A played hand and a replayed one are the same data.** The felt renders the
+newest frame of the live hand's own event log, so nothing new was needed to show
+a hand being played — and when the hand ends, the replay controls from slice 2
+step back through it with no extra state. The cursor holds `null` for "track the
+end", which is what lets the log grow underneath it without an effect chasing the
+length.
+
+**`legalActions` is the only thing that decides what the hero can do.** Buttons
+exist because it returned them and are labelled with its numbers; the slider's
+band is its `min` and `max`. There is no second opinion about the rules anywhere
+in the UI, so no tap can be illegal. The store still checks `isLegalAction`
+before applying — not to duplicate the rules, but because a tap can arrive
+against a table that has already moved on, and the felt must not crash on it.
+
+**The opponents are the PRD's own always-call baseline, not an invented
+placeholder.** It is a bot the archetypes will be measured against in slice 4,
+so it is code that stays rather than scaffolding that gets deleted. It is also
+honest about what it is: nobody will mistake this for a poker opponent.
+
+**Bots act synchronously, so the table is only ever in two states**: the hero is
+on the clock, or the hand is over. There is no "waiting for Ava" state to design
+around yet. Play-speed controls, and the pacing that makes bots feel like
+players, are their own slice.
+
+**A pot-sized raise is not a bet of the pot.** The raiser calls first, and the
+pot they are raising has grown by that call, so the increment is a fraction of
+`pot + toCall` on top of the call itself. The first version sized the presets off
+the bare pot and offered 45 where the answer was 65. With nothing to call the two
+definitions coincide, which is exactly why the bug is easy to miss.
+
+**Bet sizing is keyed to the decision, not stored across it.** Each new decision
+opens at the minimum raise rather than inheriting the last one's size — a slider
+left at all-in must not become the next street's default. Deriving that from the
+event-log length rather than resetting it in an effect keeps the value legal on
+every render.
+
+### Traps that cost real time
+
+**`@expo/ui`'s `Host` with `matchContents` collapses a SwiftUI slider to a stub.**
+The slider has no width of its own, so sizing the host to its content gives a
+40pt blob in the corner. Drop `matchContents` and give the host a height.
+
+**A JSX comment is an expression, not a statement.** Putting `{/* … */}` inside
+`{condition && ( … )}` is a syntax error, and the app keeps happily running the
+last good bundle — so the screenshot looks identical and the change appears to
+have done nothing. Check the Metro log before believing a screenshot.
+
+**A test loop that sends `call` forever never terminates**, because `call` is not
+offered when checking is free and the store correctly ignores it. Take the action
+from `legalActions` rather than assuming one, and bound the loop.
+
+### Known gaps
+
+- **No coaching yet.** Every decision is recorded in the log the coach will read,
+  but nothing grades it. That is Phase 3.
+- **No bot pacing or play-speed control**, so the table jumps from the hero's
+  action straight to their next one.
+- **The table is not configurable** — six seats, 5/10, 1 000 chips, rebuys on.
+- **The hero cannot leave a hand mid-way** or sit out.
+
+### Next
+
+Slice 4: the bot archetypes the PRD names, and the simulation harness that
+measures them against these baselines.
+
+---
+
 ## 2026-07-28 — Phase 2, slice 2: the table on screen, read-only
 
 The engine's output is now visible. A hand renders on the felt and can be stepped
