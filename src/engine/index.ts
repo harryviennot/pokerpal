@@ -40,4 +40,36 @@ export {
   type HandRank,
 } from './evaluator';
 
+export { detectDraws, drawLabel, outsToEquity, type DrawInfo, type DrawType } from './draws';
+
+export {
+  enumerateEquity,
+  equity,
+  InvalidEquityRequestError,
+  runoutCount,
+  simulateEquity,
+  type EquityRequest,
+  type EquityResult,
+  type OpponentSpec,
+} from './equity';
+
+export {
+  analyzePotOdds,
+  InvalidPotOddsError,
+  requiredEquity,
+  type CallVerdict,
+  type PotOdds,
+} from './potOdds';
+
+export {
+  allCombos,
+  expandHandToken,
+  expandRange,
+  InvalidRangeError,
+  presetRange,
+  rangeFraction,
+  type Combo,
+  type RangePreset,
+} from './ranges';
+
 export { createRng, type Rng } from './rng';
