@@ -22,13 +22,14 @@ jobs:
           node-version: 24
           cache: npm
 
-      # --omit=optional: npm does not record the dependencies of optional
-      # packages it skips on the host platform, so a macOS-generated lockfile
-      # fails `npm ci` on Linux (@napi-rs/wasm-runtime's prerelease emnapi
-      # deps). Nothing here needs those native bindings — verified that lint's
-      # import resolution, the tests and both bundle exports all still pass.
+      # `npm install`, not `npm ci`. npm omits the dependencies of optional
+      # packages it skips on the generating platform, so a macOS lockfile makes
+      # `npm ci` fail on Linux (@napi-rs/wasm-runtime's prerelease emnapi deps).
+      # The lockfile is still committed and honoured — install only fills in the
+      # platform bits npm left out — but the strict sync check is lost, so keep
+      # `npx expo install --check` below as the drift guard.
       - name: Install
-        run: npm ci --omit=optional
+        run: npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
@@ -39,8 +40,10 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
-      - name: Project health
-        run: npx expo-doctor
+      - name: Dependency drift and project health
+        run: |
+          npx expo install --check
+          npx expo-doctor
 
   build:
     name: Bundle iOS and Android
@@ -53,13 +56,14 @@ jobs:
           node-version: 24
           cache: npm
 
-      # --omit=optional: npm does not record the dependencies of optional
-      # packages it skips on the host platform, so a macOS-generated lockfile
-      # fails `npm ci` on Linux (@napi-rs/wasm-runtime's prerelease emnapi
-      # deps). Nothing here needs those native bindings — verified that lint's
-      # import resolution, the tests and both bundle exports all still pass.
+      # `npm install`, not `npm ci`. npm omits the dependencies of optional
+      # packages it skips on the generating platform, so a macOS lockfile makes
+      # `npm ci` fail on Linux (@napi-rs/wasm-runtime's prerelease emnapi deps).
+      # The lockfile is still committed and honoured — install only fills in the
+      # platform bits npm left out — but the strict sync check is lost, so keep
+      # `npx expo install --check` below as the drift guard.
       - name: Install
-        run: npm ci --omit=optional
+        run: npm install --no-audit --no-fund
 
       # Compiles the whole app through Metro for both native targets. Catches
       # what typecheck cannot: bad imports, missing assets, config errors.
@@ -80,13 +84,14 @@ jobs:
           node-version: 24
           cache: npm
 
-      # --omit=optional: npm does not record the dependencies of optional
-      # packages it skips on the host platform, so a macOS-generated lockfile
-      # fails `npm ci` on Linux (@napi-rs/wasm-runtime's prerelease emnapi
-      # deps). Nothing here needs those native bindings — verified that lint's
-      # import resolution, the tests and both bundle exports all still pass.
+      # `npm install`, not `npm ci`. npm omits the dependencies of optional
+      # packages it skips on the generating platform, so a macOS lockfile makes
+      # `npm ci` fail on Linux (@napi-rs/wasm-runtime's prerelease emnapi deps).
+      # The lockfile is still committed and honoured — install only fills in the
+      # platform bits npm left out — but the strict sync check is lost, so keep
+      # `npx expo install --check` below as the drift guard.
       - name: Install
-        run: npm ci --omit=optional
+        run: npm install --no-audit --no-fund
 
       # Fails on moderate and above. The tree is clean as of this commit; two
       # transitive advisories (brace-expansion, uuid) are held at patched
