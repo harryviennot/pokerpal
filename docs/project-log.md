@@ -6,6 +6,71 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-28 — Phase 2, slice 1: NLHE rules engine and table session
+
+The engine now knows what a hand of poker is. Eight new modules in `src/engine/`, no new dependencies, no UI.
+
+| Module | What |
+| --- | --- |
+| `events.ts` | `HandEvent` replay log union, `describeEvent` |
+| `table.ts` | `Player`, `Action`, `HandState`, `Pot` and the trivial accessors |
+| `betting.ts` | `legalActions`, min-raise rules, round closure |
+| `pots.ts` | side-pot layering, uncalled bets, odd chips |
+| `showdown.ts` | awards, split pots, reveal order and mucking |
+| `deal.ts` | validation, antes, blinds, hole cards, street opening |
+| `hand.ts` | the state machine joining the above |
+| `session.ts` | button, blind levels, busts, rebuys, hand history |
+
+322 tests passing, up from 220. Typecheck and lint clean.
+
+### Decisions worth knowing about
+
+**`legalActions(state)` is the only rule set.** It returns bounded descriptors (`{ type: 'raise', min, max }`); the UI will build its bet slider from it, bots will choose from it, and `applyBettingAction` validates against it. One source of truth, three consumers, nothing to drift. Actions use **raise-to** semantics — `to` is the player's total commitment on the street — so an all-in is just `to = committedThisStreet + stack` and there is no separate all-in action type.
+
+**An incomplete all-in raise does not reopen the betting.** A shove that raises by less than the last full raise increment lifts the price but not `lastRaiseSize`. Players who already acted must call or fold; players who had not yet acted keep full raising rights. Two per-player flags carry it: `hasActedThisStreet` and `mayRaiseThisStreet`. This is the rule most engines get wrong, and it has tests in both directions.
+
+**Uncalled bets are returned at the end of every betting round, before any pot math.** This is what keeps `buildPots` free of special cases — once the top commitment is trimmed to the second-highest, no folded player can have overcommitted, so every commitment layer is guaranteed a claimant. Side pots then reduce to layering distinct commitment levels.
+
+**Adjacent pot layers with identical claimants are merged.** Two players folding at different levels does not create two side pots when the same seats can claim both; a side pot with no distinction is not a side pot.
+
+**`dealHand(config, deck)` is public next to `startHand(config, rng)`.** Not a test hook: the shuffled deck is recorded in the opening event, so replay re-deals from it rather than reproducing an RNG sequence, and hand review can ask "what if the turn had been the ace" by handing in its own deck. It also makes scripted scenario tests readable.
+
+**Folding is not offered when checking is free.** `legalActions` omits `fold` with nothing to call. It is never correct and it is a misclick at the table; bots choosing uniformly from legal actions would also fold good hands for no reason.
+
+**Statuses are a record, not live state, once a hand ends.** A player who was all in and won keeps `allIn` with chips in front of them. Awarding does not rewrite how the hand was played, which replay needs.
+
+**Button moves forward, skipping empty seats** — no dead button. A player can post the big blind twice in a row when the seat behind them busts; that is the accepted trade in online play and it avoids cardroom bookkeeping nobody will see.
+
+**Each hand's seed is drawn from one session RNG** and recorded with the hand, so a session replays from a single seed and any individual hand replays standalone.
+
+### Traps that cost real time
+
+**A property harness built out of `expect` calls is ~50x slower than one that is not.** The first version asserted every invariant after every transition and took **69 seconds** for 8,400 hands. Collecting violations as strings and asserting once at the end took the same coverage to **1.4 seconds**. Jest's matchers, not the engine, were the entire cost — the same lesson as the Phase 1 note about benchmarking through babel-jest. Property tests belong in `test:engine`, so they have to stay cheap.
+
+**Folding around is chip-neutral over an orbit.** A session test that played hands until a short stack busted, with every player folding, looped forever: the small blind loses 5 and the big blind wins exactly that, so a three-handed table returns to its starting stacks every three hands. Tests that need a player to bust need real betting, or should state the bust directly instead of playing toward it.
+
+**An ante can put a player all in before a card is dealt.** Deal order and blind assignment were filtering on `status === 'active'`, which silently skipped that player — they would have been dealt no cards while still owning a share of the pot. Both now filter on "was dealt in" (`status !== 'sittingOut'`), which is a genuinely different question.
+
+**Antes must not count towards what a player owes.** They are dead money: posted to `committedTotal` for pot layering, but `committedThisStreet` is reset to zero afterwards or the ante is treated as a partial call of the big blind.
+
+### Testing approach
+
+The scripted tests cover the situations we thought of; `handInvariants.test.ts` covers the ones we did not. It plays **8,400 seeded hands** through a uniformly-random legal-action chooser across two-to-nine-handed tables — including stacks too short to cover a blind and tables with antes — and after every single transition checks that chips are conserved, no stack is negative or fractional, exactly one seat is on the clock and can actually act, no card is dealt twice, dealt + burned + undealt is 52, and the board matches the street. Every hand must terminate inside 500 actions.
+
+That harness is what makes the engine safe to hand to bots in the next slice, since bots will find every unreachable branch eventually.
+
+### Known gaps
+
+- **Reveal order after an all-in run-out** falls back to "first seat left of the button" rather than the last aggressor from the last street that had betting. Cosmetic — it moves no chips — but it is not quite the TDA rule.
+- **No straddles, no run-it-twice, no dead button.** None are in the PRD.
+- Session-level chip conservation is asserted in tests but the session layer has no property harness of its own; hand-level invariants carry it for now.
+
+### Next
+
+Slice 2 of Phase 2: the table UI, read-only — render a `HandState` on the felt with no betting controls, driven by hand history. Then betting actions, then the bot archetypes the PRD names.
+
+---
+
 ## 2026-07-28 — Phase 1: Foundation and Odds Calculator
 
 Went from an empty repository to a working odds calculator. Five commits on `main`, delivered as four PRs.
