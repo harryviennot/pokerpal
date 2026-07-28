@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm install`, not `npm ci`. npm omits the dependencies of optional
+      # packages it skips on the generating platform, so a macOS lockfile makes
+      # `npm ci` fail on Linux (@napi-rs/wasm-runtime's prerelease emnapi deps).
+      # The lockfile is still committed and honoured — install only fills in the
+      # platform bits npm left out — but the strict sync check is lost, so keep
+      # `npx expo install --check` below as the drift guard.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint and format
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --ci
+
+      - name: Dependency drift and project health
+        run: |
+          npx expo install --check
+          npx expo-doctor
+
+  build:
+    name: Bundle iOS and Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm install`, not `npm ci`. npm omits the dependencies of optional
+      # packages it skips on the generating platform, so a macOS lockfile makes
+      # `npm ci` fail on Linux (@napi-rs/wasm-runtime's prerelease emnapi deps).
+      # The lockfile is still committed and honoured — install only fills in the
+      # platform bits npm left out — but the strict sync check is lost, so keep
+      # `npx expo install --check` below as the drift guard.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      # Compiles the whole app through Metro for both native targets. Catches
+      # what typecheck cannot: bad imports, missing assets, config errors.
+      - name: Export bundles
+        run: npx expo export --platform ios --platform android --output-dir dist
+
+      - name: Report bundle sizes
+        run: du -h dist/_expo/static/js/*/*.hbc | sort -h
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm install`, not `npm ci`. npm omits the dependencies of optional
+      # packages it skips on the generating platform, so a macOS lockfile makes
+      # `npm ci` fail on Linux (@napi-rs/wasm-runtime's prerelease emnapi deps).
+      # The lockfile is still committed and honoured — install only fills in the
+      # platform bits npm left out — but the strict sync check is lost, so keep
+      # `npx expo install --check` below as the drift guard.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      # Fails on moderate and above. The tree is clean as of this commit; two
+      # transitive advisories (brace-expansion, uuid) are held at patched
+      # versions by the `overrides` block in package.json, because npm's own
+      # fix for them was a semver-major downgrade of jest and expo-splash-screen.
+      - name: Audit
+        run: npm audit --audit-level=moderate
