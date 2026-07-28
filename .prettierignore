@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+web-build/
+ios/
+android/
+expo-env.d.ts
+package-lock.json
+
+# Human-authored spec and convention documents — not ours to reformat.
+CLAUDE.md
+docs/
