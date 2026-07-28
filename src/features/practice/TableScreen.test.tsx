@@ -123,6 +123,24 @@ describe('TableScreen', () => {
     expect(screen.getByLabelText('Fold')).toBeOnTheScreen();
   });
 
+  it('grades the hand once it is over', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('Fold'));
+
+    // Folding the button preflop is graded, and the note names the price and
+    // the equity rather than an opinion.
+    expect(screen.getByText(/Folded/)).toBeOnTheScreen();
+    expect(screen.getByText(/equity/)).toBeOnTheScreen();
+  });
+
+  it('says nothing about a hand still in progress', async () => {
+    await render(<TableScreen />);
+
+    expect(screen.queryByText(/equity/)).not.toBeOnTheScreen();
+  });
+
   it('steps back through the hand once it is finished', async () => {
     const user = setupUser();
 

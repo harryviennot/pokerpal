@@ -170,6 +170,16 @@ export {
 } from './archetypes';
 
 export {
+  reviewDecision,
+  reviewHand,
+  type CoachOptions,
+  type DecisionFacts,
+  type DecisionReview,
+  type Grade,
+  type Leak,
+} from './coach';
+
+export {
   chenScore,
   modelOpponents,
   strengthOf,

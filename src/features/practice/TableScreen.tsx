@@ -7,9 +7,11 @@ import { amountToCall, legalActions, snapshotPot, type LegalAction, type Street 
 
 import { ActionBar } from './ActionBar';
 import { BetSizer } from './BetSizer';
+import { CoachNote } from './CoachNote';
 import { HandResult } from './HandResult';
 import { PokerTable } from './PokerTable';
 import { ReplayControls } from './ReplayControls';
+import { useHandCoach, worstDecision } from './useHandCoach';
 import { useHandReplay } from './useHandReplay';
 import { usePracticeStore } from './usePracticeStore';
 
@@ -50,6 +52,7 @@ export function TableScreen() {
   const raise = legal.find((action) => action.type === 'bet' || action.type === 'raise');
 
   const [betTo, setBetTo] = useBetSizing(hand.events.length, raise);
+  const reviews = useHandCoach(hand, heroSeat, handSeats);
 
   return (
     <Screen>
@@ -73,6 +76,7 @@ export function TableScreen() {
             onStepStreet={replay.stepStreet}
             onRestart={replay.restart}
           />
+          <CoachNote review={worstDecision(reviews)} total={reviews.length} />
           <HandResult
             net={(hand.players[heroSeat]?.stack ?? 0) - (handSeats[heroSeat]?.stack ?? 0)}
             onNextHand={nextHand}
