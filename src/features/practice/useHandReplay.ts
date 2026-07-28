@@ -10,10 +10,23 @@ export interface HandReplay {
   snapshot: TableSnapshot;
   atStart: boolean;
   atEnd: boolean;
+  /** True while the cursor is tracking the end of a log that is still growing. */
+  following: boolean;
   step: (delta: number) => void;
   /** Jumps to the next or previous street, or to either end of the hand. */
   stepStreet: (delta: number) => void;
   restart: () => void;
+  /** Returns the cursor to the end and pins it there. */
+  follow: () => void;
+}
+
+export interface HandReplayOptions {
+  /**
+   * Track the end of the log rather than starting at the top. A hand being
+   * played is a log that grows, and the table wants its newest frame; stepping
+   * back drops out of it, and `follow()` returns.
+   */
+  follow?: boolean;
 }
 
 /**
@@ -22,28 +35,36 @@ export interface HandReplay {
  * The hook owns nothing but the cursor: the frames are derived from the log and
  * every table state the screen renders comes back out of the engine.
  */
-export function useHandReplay(input: ReplayInput): HandReplay {
+export function useHandReplay(input: ReplayInput, options: HandReplayOptions = {}): HandReplay {
   const frames = useMemo(() => replayHand(input), [input]);
-  const [cursor, setCursor] = useState(0);
+  // Null is the cursor tracking the end of the log. Holding it as an absence
+  // rather than a number is what lets a live hand grow under the table without
+  // the hook chasing the length in an effect.
+  const [cursor, setCursor] = useState<number | null>(options.follow ? null : 0);
 
   const last = Math.max(0, frames.length - 1);
-  const index = Math.min(cursor, last);
+  const index = cursor === null ? last : Math.min(cursor, last);
 
   const step = useCallback(
     (delta: number) => {
-      setCursor((current) => clamp(Math.min(current, last) + delta, last));
+      setCursor((current) =>
+        clamp((current === null ? last : Math.min(current, last)) + delta, last),
+      );
     },
     [last],
   );
 
   const stepStreet = useCallback(
     (delta: number) => {
-      setCursor((current) => nextStreetIndex(frames, Math.min(current, last), delta));
+      setCursor((current) =>
+        nextStreetIndex(frames, current === null ? last : Math.min(current, last), delta),
+      );
     },
     [frames, last],
   );
 
   const restart = useCallback(() => setCursor(0), []);
+  const follow = useCallback(() => setCursor(null), []);
 
   // `frames` is never empty in practice — a hand always logs a `handStart` —
   // but the fallback keeps the screen renderable rather than throwing at it.
@@ -56,9 +77,11 @@ export function useHandReplay(input: ReplayInput): HandReplay {
     snapshot: frame.snapshot,
     atStart: index === 0,
     atEnd: index === last,
+    following: cursor === null,
     step,
     stepStreet,
     restart,
+    follow,
   };
 }
 

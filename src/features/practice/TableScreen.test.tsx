@@ -1,18 +1,13 @@
 import { cleanup, render, screen, userEvent } from '@testing-library/react-native';
 
 import { TableScreen } from './TableScreen';
+import { usePracticeStore } from './usePracticeStore';
 
 const setupUser = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
-/** Steps the replay forwards by pressing the primary control. */
-async function stepForward(user: ReturnType<typeof userEvent.setup>, times: number) {
-  for (let step = 0; step < times; step++) {
-    await user.press(screen.getByLabelText('Next action'));
-  }
-}
-
 beforeEach(() => {
   jest.useFakeTimers();
+  usePracticeStore.getState().reset();
 });
 
 afterEach(async () => {
@@ -22,74 +17,97 @@ afterEach(async () => {
 });
 
 describe('TableScreen', () => {
-  it('opens on the first frame of the demo hand', async () => {
+  it('opens with the hero on the clock', async () => {
     await render(<TableScreen />);
 
-    expect(screen.getByText('Hand #1 begins, button on You')).toBeOnTheScreen();
-    expect(screen.getByText(/^Preflop · 1 of/)).toBeOnTheScreen();
+    expect(screen.getByLabelText('Fold')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Call 10')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/^Raise to/)).toBeOnTheScreen();
   });
 
-  it('seats every player with their starting stack', async () => {
+  it('seats the table with the hero face up and everyone else face down', async () => {
     await render(<TableScreen />);
 
     expect(screen.getByLabelText('You, 1 000 behind')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Ben, 240 behind')).toBeOnTheScreen();
+    expect(screen.getAllByLabelText('Face-down card')).toHaveLength(10);
     expect(screen.getByLabelText('Dealer button')).toBeOnTheScreen();
   });
 
-  it('advances the commentary one action at a time', async () => {
-    const user = setupUser();
-
+  it('offers no controls the rules did not', async () => {
     await render(<TableScreen />);
-    await stepForward(user, 1);
 
-    expect(screen.getByText('Ava posts the small blind 5')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Bet 5')).toBeOnTheScreen();
+    // Checking is not legal facing the big blind.
+    expect(screen.queryByLabelText('Check')).not.toBeOnTheScreen();
   });
 
-  it('will not step back past the start of the hand', async () => {
+  it('opens the raise at the minimum and resizes from the presets', async () => {
     const user = setupUser();
 
     await render(<TableScreen />);
-    await user.press(screen.getByLabelText('Previous action'));
+
+    expect(screen.getByLabelText('Raise to 20')).toBeOnTheScreen();
+
+    await user.press(screen.getByLabelText('Pot'));
+
+    // The pot is 45 — two blinds and three callers — and the hero owes 10. A
+    // pot-sized raise calls that 10 and raises the 55 behind it.
+    expect(screen.getByLabelText('Raise to 65')).toBeOnTheScreen();
+  });
+
+  it('sizes half pot off the pot the call has already grown', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('½ pot'));
+
+    // 10 to call, then half of the 55 that leaves in the middle.
+    expect(screen.getByLabelText('Raise to 38')).toBeOnTheScreen();
+  });
+
+  it('plays the hero decision and moves the hand on', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('Call 10'));
+
+    expect(usePracticeStore.getState().hand.events.length).toBeGreaterThan(0);
+    expect(screen.getByText(/^Flop ·/)).toBeOnTheScreen();
+  });
+
+  it('shows the result and the way on once the hand is over', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('Fold'));
+
+    expect(screen.getByLabelText('Next hand')).toBeOnTheScreen();
+    // The hero folded on the button, having posted nothing.
+    expect(screen.getByText('No chips changed hands')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Fold')).not.toBeOnTheScreen();
+  });
+
+  it('deals another hand on request', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('Fold'));
+    await user.press(screen.getByLabelText('Next hand'));
+
+    expect(usePracticeStore.getState().session.handsPlayed).toBe(1);
+    expect(screen.getByLabelText('Fold')).toBeOnTheScreen();
+  });
+
+  it('steps back through the hand once it is finished', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('Fold'));
+
+    const live = screen.getByText(/of \d+$/).props.children.join('');
+
+    await user.press(screen.getByLabelText('Restart the hand'));
 
     expect(screen.getByText('Hand #1 begins, button on You')).toBeOnTheScreen();
-  });
-
-  it('keeps the opponents face down while the hero is face up', async () => {
-    const user = setupUser();
-
-    await render(<TableScreen />);
-    // Blinds, then two cards to each of the six seats.
-    await stepForward(user, 8);
-
-    expect(screen.getAllByLabelText('Face-down card')).toHaveLength(10);
-    expect(screen.getByLabelText('A of clubs')).toBeOnTheScreen();
-    expect(screen.getByLabelText('A of diamonds')).toBeOnTheScreen();
-  });
-
-  it('deals the board and pulls the bets into the pot on the flop', async () => {
-    const user = setupUser();
-
-    await render(<TableScreen />);
-    await user.press(screen.getByLabelText('Next street'));
-
-    expect(screen.getByText(/^Flop ·/)).toBeOnTheScreen();
-    // Two callers of a raise to 30, plus the small blind that folded.
-    expect(screen.getByLabelText('POT 95')).toBeOnTheScreen();
-    expect(screen.queryByLabelText('Bet 30')).not.toBeOnTheScreen();
-  });
-
-  it('shows the hand down and pays the winner', async () => {
-    const user = setupUser();
-
-    await render(<TableScreen />);
-    for (let street = 0; street < 5; street++) {
-      await user.press(screen.getByLabelText('Next street'));
-    }
-
-    expect(screen.getByText(/^Hand ends on the/)).toBeOnTheScreen();
-    expect(screen.getByLabelText('You, 1 320 behind')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Ben, 0 behind')).toBeOnTheScreen();
+    expect(screen.getByText(/of \d+$/).props.children.join('')).not.toBe(live);
   });
 });

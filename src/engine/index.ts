@@ -153,3 +153,5 @@ export {
   type SessionState,
   type TableStyle,
 } from './session';
+
+export { alwaysCall, alwaysFold, playUntilSeat, type BotPolicy } from './bots';
