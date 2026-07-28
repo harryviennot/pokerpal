@@ -22,8 +22,13 @@ jobs:
           node-version: 24
           cache: npm
 
+      # --omit=optional: npm does not record the dependencies of optional
+      # packages it skips on the host platform, so a macOS-generated lockfile
+      # fails `npm ci` on Linux (@napi-rs/wasm-runtime's prerelease emnapi
+      # deps). Nothing here needs those native bindings — verified that lint's
+      # import resolution, the tests and both bundle exports all still pass.
       - name: Install
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Typecheck
         run: npm run typecheck
@@ -48,8 +53,13 @@ jobs:
           node-version: 24
           cache: npm
 
+      # --omit=optional: npm does not record the dependencies of optional
+      # packages it skips on the host platform, so a macOS-generated lockfile
+      # fails `npm ci` on Linux (@napi-rs/wasm-runtime's prerelease emnapi
+      # deps). Nothing here needs those native bindings — verified that lint's
+      # import resolution, the tests and both bundle exports all still pass.
       - name: Install
-        run: npm ci
+        run: npm ci --omit=optional
 
       # Compiles the whole app through Metro for both native targets. Catches
       # what typecheck cannot: bad imports, missing assets, config errors.
@@ -70,8 +80,13 @@ jobs:
           node-version: 24
           cache: npm
 
+      # --omit=optional: npm does not record the dependencies of optional
+      # packages it skips on the host platform, so a macOS-generated lockfile
+      # fails `npm ci` on Linux (@napi-rs/wasm-runtime's prerelease emnapi
+      # deps). Nothing here needs those native bindings — verified that lint's
+      # import resolution, the tests and both bundle exports all still pass.
       - name: Install
-        run: npm ci
+        run: npm ci --omit=optional
 
       # Fails on moderate and above. The tree is clean as of this commit; two
       # transitive advisories (brace-expansion, uuid) are held at patched
