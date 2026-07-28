@@ -11,6 +11,7 @@ import {
   MANIAC,
   playUntilSeat,
   ROCK,
+  SHARK,
   startNextHand,
   startSession,
   TAG,
@@ -37,8 +38,9 @@ const BOT_SEED_OFFSET = 0x9e3779b9;
  *
  * A spread of personalities rather than five copies of one, so a session shows
  * the player what each type does to them: two solid opponents to lose to, a
- * station to value bet, a maniac to trap, and a rock to steal from. Choosing
- * the mix is the table-configuration slice.
+ * station to value bet, a maniac to trap, a rock to steal from, and one Shark
+ * that reads what the player has been representing. Choosing the mix is the
+ * table-configuration slice.
  */
 const TABLE: readonly { id: string; profile: BotProfile | null }[] = [
   { id: 'You', profile: null },
@@ -46,7 +48,7 @@ const TABLE: readonly { id: string; profile: BotProfile | null }[] = [
   { id: 'Ben', profile: CALLING_STATION },
   { id: 'Cleo', profile: ROCK },
   { id: 'Dev', profile: MANIAC },
-  { id: 'Elle', profile: TAG },
+  { id: 'Elle', profile: SHARK },
 ];
 
 /**

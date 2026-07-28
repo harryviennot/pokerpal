@@ -1,12 +1,15 @@
 /**
  * The named bot archetypes.
  *
- * These sit at the PRD's second layer: hand evaluation underneath, then equity
- * against the price the pot is offering. They do not model an opponent's range
- * and they do not balance their bluffs — that is the Hard and Shark work, and it
- * needs the layers above this one. What they do have is a personality, and the
- * leaks that come with it, because a player learns more from an opponent whose
- * mistake they can name than from one that is merely correct.
+ * Four of them sit at the PRD's second layer: hand evaluation underneath, then
+ * equity against the price the pot is offering, and a personality on top. They
+ * have the leaks their names promise, because a player learns more from an
+ * opponent whose mistake they can name than from one that is merely correct.
+ *
+ * The Shark adds the third: it narrows every opponent to a range from what they
+ * have done, and measures its equity against that instead of against a random
+ * hand. What none of them have yet is balance — no bluff here is priced against
+ * a value bet — or any memory of the player across hands.
  *
  * Every read is noisy and every threshold is a frequency, so the same bot in the
  * same spot does not always do the same thing — but given the same seeded RNG it
@@ -14,8 +17,10 @@
  */
 
 import { type BotPolicy } from './bots';
-import { simulateEquity } from './equity';
+import { type Card } from './cards';
+import { simulateEquity, type OpponentSpec } from './equity';
 import { potRaiseTo, requiredEquity } from './potOdds';
+import { modelOpponents } from './rangeModel';
 import { type Rng } from './rng';
 import {
   amountToCall,
@@ -25,6 +30,7 @@ import {
   type Action,
   type HandState,
   type LegalAction,
+  type SeatIndex,
 } from './table';
 
 /**
@@ -51,6 +57,11 @@ export interface BotProfile {
   betSize: number;
   /** Noise on every equity read, in equity points. The tilt dial. */
   noise: number;
+  /**
+   * Whether this bot narrows each opponent to a range from their actions rather
+   * than treating them as a random hand. The step from Medium to Hard.
+   */
+  readsRanges?: boolean;
 }
 
 /** Very tight, and only interested when it already has the best of it. */
@@ -101,7 +112,26 @@ export const TAG: BotProfile = {
   noise: 0.03,
 };
 
-export const ARCHETYPES: readonly BotProfile[] = [ROCK, CALLING_STATION, MANIAC, TAG];
+/**
+ * Tight, aggressive, and — unlike the four above it — aware of what the other
+ * seats have been telling it. Its thresholds look loose next to the TAG's only
+ * because they are measured against a range that has already been narrowed: a
+ * hand that beats what an opponent is actually representing is worth more than
+ * the same hand against a random one.
+ */
+export const SHARK: BotProfile = {
+  name: 'The Shark',
+  entry: 1.15,
+  callSlack: 0.01,
+  raiseAt: 1.45,
+  aggression: 0.8,
+  bluff: 0.18,
+  betSize: 0.7,
+  noise: 0.01,
+  readsRanges: true,
+};
+
+export const ARCHETYPES: readonly BotProfile[] = [ROCK, CALLING_STATION, MANIAC, TAG, SHARK];
 
 export interface BotOptions {
   /**
@@ -151,7 +181,7 @@ function decide(
   const raw = simulateEquity({
     hero: player.holeCards,
     board: state.board,
-    opponents: Array.from({ length: opponents }, () => ({ kind: 'random' }) as const),
+    opponents: opponentSpecs(state, seat, opponents, profile, player.holeCards),
     iterations,
     rng,
   }).equity;
@@ -189,6 +219,36 @@ function decide(
   const priced = equity + profile.callSlack >= requiredEquity(pot, toCall);
 
   return priced && strength >= profile.entry ? { type: 'call' } : { type: 'fold' };
+}
+
+/**
+ * Who the bot thinks it is up against.
+ *
+ * A bot that does not read ranges treats every opponent as a random hand, which
+ * is what the first four archetypes do. One that does asks `modelOpponents` what
+ * each seat's actions have said and runs its equity against those hands instead
+ * — the difference between "I have 40% against anything" and "I have 40% against
+ * a range that just raised twice", which are not the same 40%.
+ *
+ * A seat whose range collapsed to nothing falls back to random rather than
+ * producing an impossible equity request.
+ */
+function opponentSpecs(
+  state: HandState,
+  seat: SeatIndex,
+  opponents: number,
+  profile: BotProfile,
+  hole: readonly [Card, Card],
+): OpponentSpec[] {
+  if (!profile.readsRanges) {
+    return Array.from({ length: opponents }, () => ({ kind: 'random' }) as const);
+  }
+
+  const models = modelOpponents(state, seat, { dead: hole });
+
+  return [...models.values()].map((model) =>
+    model.combos.length > 0 ? { kind: 'range', combos: model.combos } : { kind: 'random' },
+  );
 }
 
 /** The safest legal action when there is nothing to reason about. */
