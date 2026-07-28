@@ -1,4 +1,29 @@
-import { analyzePotOdds, InvalidPotOddsError, requiredEquity } from './potOdds';
+import { analyzePotOdds, InvalidPotOddsError, potRaiseTo, requiredEquity } from './potOdds';
+
+describe('potRaiseTo', () => {
+  it('bets a fraction of the pot when there is nothing to call', () => {
+    expect(potRaiseTo(1, 100, 0)).toBe(100);
+    expect(potRaiseTo(0.5, 100, 0)).toBe(50);
+    expect(potRaiseTo(0.75, 80, 0)).toBe(60);
+  });
+
+  it('calls first, then raises the pot the call has grown', () => {
+    // The classic spot: 45 in the middle, 10 to call. A pot-sized raise is the
+    // 10, then 55 on top — not a bet of 45.
+    expect(potRaiseTo(1, 45, 10)).toBe(65);
+    expect(potRaiseTo(0.5, 45, 10)).toBe(38);
+  });
+
+  it('adds what the raiser already has on the street', () => {
+    // Having bet 20 and facing a raise to 60, the total commitment is what is
+    // already out there plus the call plus the raise.
+    expect(potRaiseTo(1, 120, 40, 20)).toBe(220);
+  });
+
+  it('rounds to whole chips', () => {
+    expect(Number.isInteger(potRaiseTo(0.5, 45, 5))).toBe(true);
+  });
+});
 
 describe('requiredEquity', () => {
   it('is the call divided by the pot after the call', () => {

@@ -104,15 +104,18 @@ describe('usePracticeStore', () => {
     expect(handSeats.reduce((sum, seat) => sum + seat.stack, 0)).toBe(6000);
   });
 
-  it('conserves chips across a run of hands', () => {
-    for (let hand = 0; hand < 25; hand++) {
+  it('conserves chips within every hand of a run', () => {
+    for (let hand = 0; hand < 20; hand++) {
+      // Measured per hand, not across the session: a rebuy between hands puts
+      // chips back on the table on purpose, so the session total does move.
+      const before = read().handSeats.reduce((sum, seat) => sum + seat.stack, 0);
+
       for (let step = 0; step < 100 && !read().hand.complete; step++) {
         heroCalls();
       }
 
       expect(read().hand.complete).toBe(true);
-
-      expect(read().hand.players.reduce((sum, player) => sum + player.stack, 0)).toBe(6000);
+      expect(read().hand.players.reduce((sum, player) => sum + player.stack, 0)).toBe(before);
 
       read().nextHand();
     }

@@ -16,7 +16,13 @@
 import { legalActions } from './betting';
 import { applyAction } from './hand';
 import { type Rng } from './rng';
-import { type Action, type HandState, type LegalAction, type SeatIndex } from './table';
+import {
+  InvalidTableError,
+  type Action,
+  type HandState,
+  type LegalAction,
+  type SeatIndex,
+} from './table';
 
 /**
  * Chooses one of `legal`. Callers pass the result straight to `applyAction`, so
@@ -42,6 +48,25 @@ export const alwaysFold: BotPolicy = (_state, legal) => {
 
   return fold ? { type: 'fold' } : { type: 'check' };
 };
+
+/**
+ * Combines one policy per seat into a single policy that dispatches on whoever
+ * is on the clock, so a table of different personalities is still just a
+ * `BotPolicy` to everything downstream.
+ *
+ * @throws {InvalidTableError} when the seat on the clock has no policy.
+ */
+export function bySeat(policies: readonly BotPolicy[]): BotPolicy {
+  return (state, legal, rng) => {
+    const policy = state.toAct === null ? undefined : policies[state.toAct];
+
+    if (!policy) {
+      throw new InvalidTableError(`No policy for seat ${state.toAct}.`);
+    }
+
+    return policy(state, legal, rng);
+  };
+}
 
 /**
  * Runs `policy` for whoever is on the clock until the hand needs a decision from
