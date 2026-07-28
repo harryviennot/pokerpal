@@ -24,7 +24,15 @@ module.exports = {
     {
       displayName: 'app',
       preset: 'jest-expo/ios',
-      testMatch: ['<rootDir>/src/**/*.test.tsx', '<rootDir>/app/**/*.test.tsx'],
+      // Everything outside the engine's own fast project: components, hooks and
+      // feature stores, whether or not the file contains JSX.
+      testMatch: [
+        '<rootDir>/src/**/*.test.ts',
+        '<rootDir>/src/**/*.test.tsx',
+        '<rootDir>/app/**/*.test.tsx',
+      ],
+      testPathIgnorePatterns: ['<rootDir>/src/engine/', '<rootDir>/src/utils/'],
+      setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
         '^@/assets/(.*)$': '<rootDir>/assets/$1',
