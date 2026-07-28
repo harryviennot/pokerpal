@@ -19,6 +19,12 @@ export interface PokerTableProps {
 /** How far in from the felt's edge the chips sit, as a fraction of the radius. */
 const BET_RADIUS = 0.58;
 
+/** Corner radius as a fraction of the felt's short side. */
+const FELT_ROUNDNESS = 0.3;
+
+/** Width of the rail drawn around the felt. */
+const RAIL = spacing.sm;
+
 /**
  * The felt: seats around a racetrack, the board and the pot in the middle.
  *
@@ -50,7 +56,9 @@ export function PokerTable({ snapshot, heroSeat }: PokerTableProps) {
           {
             backgroundColor: colors.felt,
             borderColor: colors.feltRail,
-            borderRadius: Math.min(size.width, size.height) / 2,
+            // Rounded like a table, not a capsule: a radius of half the short
+            // side turns a portrait felt into a pill.
+            borderRadius: Math.min(size.width, size.height) * FELT_ROUNDNESS,
           },
         ]}
       />
@@ -114,8 +122,10 @@ function spot(
   // Screen y grows downwards, so a quarter turn is the bottom of the table and
   // subtracting the step walks seats up the right-hand side first.
   const angle = Math.PI / 2 - (2 * Math.PI * step) / count;
-  const rx = (size.width / 2 - SEAT_WIDTH / 2) * radiusScale;
-  const ry = (size.height / 2 - SEAT_HEIGHT / 2) * radiusScale;
+  // Inset by half a seat plus the rail, so a whole seat — cards included — sits
+  // on the felt rather than hanging over the edge of the screen.
+  const rx = (size.width / 2 - SEAT_WIDTH / 2 - RAIL) * radiusScale;
+  const ry = (size.height / 2 - SEAT_HEIGHT / 2 - RAIL) * radiusScale;
 
   return {
     x: size.width / 2 + rx * Math.cos(angle) - SEAT_WIDTH / 2,
@@ -129,10 +139,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   felt: {
-    // Inset so the seats straddle the rail rather than floating outside it.
     position: 'absolute',
-    inset: SEAT_HEIGHT / 2,
-    borderWidth: spacing.sm,
+    inset: 0,
+    borderWidth: RAIL,
   },
   middle: {
     alignItems: 'center',

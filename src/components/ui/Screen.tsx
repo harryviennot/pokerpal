@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/useTheme';
 import { spacing } from '@/theme';
@@ -16,6 +17,7 @@ export interface ScreenProps {
 /** Page container: applies the background token and consistent edge padding. */
 export function Screen({ children, scroll = false, center = false, contentStyle }: ScreenProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const padding = [styles.content, center && styles.centered, contentStyle];
 
   if (scroll) {
@@ -31,8 +33,18 @@ export function Screen({ children, scroll = false, center = false, contentStyle 
     );
   }
 
+  // A scroll view gets its insets from the system; a fixed one has to ask, or
+  // its last row sits under the floating tab bar.
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }, padding]}>{children}</View>
+    <View
+      style={[
+        styles.flex,
+        { backgroundColor: colors.background },
+        padding,
+        { paddingBottom: spacing.base + insets.bottom },
+      ]}>
+      {children}
+    </View>
   );
 }
 

@@ -23,7 +23,8 @@ export function ReplayControls({
 }: ReplayControlsProps) {
   return (
     <View style={styles.row}>
-      <ControlButton label="⏮" hint="Restart the hand" onPress={onRestart} disabled={atStart} />
+      {/* A text glyph, not ⏮ — the media symbols render as colour emoji. */}
+      <ControlButton label="↺" hint="Restart the hand" onPress={onRestart} disabled={atStart} />
       <ControlButton
         label="‹‹"
         hint="Previous street"

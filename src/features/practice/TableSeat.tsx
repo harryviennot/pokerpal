@@ -24,18 +24,19 @@ export function TableSeat({ seat, onButton, active, revealed }: TableSeatProps) 
   const { colors } = useTheme();
   const out = seat.status === 'folded' || seat.status === 'sittingOut';
   const faceUp = revealed || seat.shown;
+  // A seat that folded or mucked has no cards in front of it any more.
+  const holeCards = out || seat.mucked ? null : seat.holeCards;
 
   return (
     <View style={[styles.wrapper, out && styles.out]} accessibilityLabel={label(seat)}>
       <View style={styles.cards}>
-        {seat.holeCards && !seat.mucked ? (
-          seat.holeCards.map((card) => (
+        {holeCards ? (
+          holeCards.map((card) => (
             <PlayingCard
               key={card}
               size="small"
               card={faceUp ? card : undefined}
               faceDown={!faceUp}
-              dimmed={out}
             />
           ))
         ) : (
