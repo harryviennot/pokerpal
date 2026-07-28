@@ -1,4 +1,4 @@
-import { makeBot, TAG } from './archetypes';
+import { makeBot, SHARK, TAG } from './archetypes';
 import { alwaysCall, alwaysFold } from './bots';
 import { simulateMatch } from './simulate';
 import { InvalidTableError } from './table';
@@ -91,6 +91,38 @@ describe('simulateMatch', () => {
 const long = process.env.POKER_LONG_SIM === '1' ? describe : describe.skip;
 
 long('the long run', () => {
+  /**
+   * The PRD's tier ladder: a Hard bot has to beat a Medium one. Three of each,
+   * seats interleaved so neither side owns the button, over a sample big enough
+   * that a single seed's variance cannot decide it. Measured at 2 400 hands
+   * while writing this: the Sharks took 4 348 chips off the TAGs, winning five
+   * of six seeds — the one they lost is why this is not a 400-hand test.
+   */
+  it('has the Shark beat the TAG', () => {
+    let sharks = 0;
+
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const result = simulateMatch({
+        policies: [
+          makeBot(SHARK),
+          makeBot(TAG),
+          makeBot(SHARK),
+          makeBot(TAG),
+          makeBot(SHARK),
+          makeBot(TAG),
+        ],
+        hands: 400,
+        startingStack: 1000,
+        blinds: BLINDS,
+        seed,
+      });
+
+      sharks += (result.net[0] ?? 0) + (result.net[2] ?? 0) + (result.net[4] ?? 0);
+    }
+
+    expect(sharks).toBeGreaterThan(0);
+  }, 3_600_000);
+
   it('has the TAG beat a table of calling stations over 100k hands', () => {
     const result = simulateMatch({
       policies: [makeBot(TAG), alwaysCall, alwaysCall, alwaysCall, alwaysCall, alwaysCall],

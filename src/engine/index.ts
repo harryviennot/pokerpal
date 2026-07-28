@@ -163,9 +163,18 @@ export {
   MANIAC,
   makeBot,
   ROCK,
+  SHARK,
   TAG,
   type BotOptions,
   type BotProfile,
 } from './archetypes';
+
+export {
+  chenScore,
+  modelOpponents,
+  strengthOf,
+  type OpponentModel,
+  type RangeModelOptions,
+} from './rangeModel';
 
 export { simulateMatch, type MatchConfig, type MatchResult } from './simulate';

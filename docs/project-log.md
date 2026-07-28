@@ -6,6 +6,83 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 2, slice 5: range modelling and the Shark
+
+The bots stop treating every opponent as a random hand. The Shark narrows each
+seat to a range from what they have actually done, and measures its equity
+against that — the PRD's third layer.
+
+| File | What |
+| --- | --- |
+| `src/engine/rangeModel.ts` | `modelOpponents`, `chenScore`, `strengthOf` |
+| `src/engine/archetypes.ts` | `SHARK`, and `readsRanges` on the profile |
+
+396 tests passing, up from 384. Typecheck and lint clean. No new dependencies.
+
+### Decisions worth knowing about
+
+**The Shark beats the TAG, measured rather than asserted.** Three of each,
+interleaved so neither side owns the button, 2 400 hands: **the Sharks took
+4 348 chips off the TAGs, winning five of six seeds.** That single losing seed is
+why the test lives in the opt-in long run and not in the fast suite — a
+400-hand version of it would pass or fail on which seed it was given, and a test
+that depends on that is measuring variance, not the bot.
+
+**The model reads only the public log.** It walks `state.events`, so a bot can
+never see a card the table has not shown. Ranges narrow against the board *as it
+stood when the action was taken* — a flop raise says something about the flop,
+not about the river that arrived two streets later.
+
+**Narrowing is deliberately timid, and that direction is the safe one.** A raise
+keeps the top 35%, a call 70%, a check 90%, and nothing narrows below 12 combos.
+Narrowing too hard invents a range the opponent never had and then folds correct
+calls to it; narrowing too little only costs a little edge.
+
+**What the model does not know is worth stating plainly.** It ranks by strength,
+so it captures "they are representing something strong" and nothing else — not
+draws, not a line that makes no sense, not a player who checks a monster, and no
+memory across hands. Balance and exploitation are the layers above it.
+
+**Preflop strength is the Chen formula.** It is cheap, well known, and only has
+to sort 169 starting hands into roughly the right order. The published values are
+pinned in the tests — AA 20, AKs 12, 72o −1 — so a change to the implementation
+has to admit it. Postflop the ordering comes from the evaluator, where it is
+exact.
+
+### Traps that cost real time
+
+**A 100-hand sample said the Shark was losing.** Its first measurement came back
+at −104 bb/100 against a mixed table, which looked like the range model was
+actively harmful. It was noise: at 2 400 hands the same bot is comfortably ahead.
+Do not tune a poker bot against a sample that small — and do not report one
+either.
+
+**Four-handed with the button on seat 0, the first seat to act is 3.** Two range
+tests asserted against the wrong seat and failed for a reason that had nothing to
+do with the code under test.
+
+**`parseCards` wants spaces.** `'AsAh'` is not two cards, it is an error.
+
+### Known gaps
+
+- **No mixed strategies and no CFR tables.** The Shark's bluffs are a frequency,
+  not a balanced fraction of its value bets, and the PRD's fourth layer wants
+  solved charts shipped with the app.
+- **No exploitation layer.** No bot tracks the player across hands, so none of
+  them can punish a specific leak — the thing the PRD calls deliberately
+  educational.
+- **The tier ladder is two rungs.** Hard beats Medium; there is no Easy tier
+  defined below them yet, so "each tier beats the one below" is only half tested.
+- **Range modelling costs about 15 ms a decision**, which is invisible for one
+  bot at a table and the reason a Shark-heavy simulation is several times slower.
+
+### Next
+
+Slice 6: mixed frequencies and balance — pricing bluffs against value bets rather
+than rolling for them.
+
+---
+
 ## 2026-07-29 — Phase 2, slice 4: the bot archetypes, and the scales to weigh them
 
 The table has real opponents. Four of the PRD's named archetypes play the felt,

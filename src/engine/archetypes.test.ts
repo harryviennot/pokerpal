@@ -1,4 +1,4 @@
-import { ARCHETYPES, CALLING_STATION, makeBot, MANIAC, ROCK, TAG } from './archetypes';
+import { ARCHETYPES, CALLING_STATION, makeBot, MANIAC, ROCK, SHARK, TAG } from './archetypes';
 import { legalActions } from './betting';
 import { alwaysCall } from './bots';
 import { applyAction, startHand } from './hand';
@@ -148,5 +148,9 @@ describe('measured against the baseline', () => {
 
   it('has the Rock beat it too, by playing far fewer hands', () => {
     expect(beatsAlwaysCall(ROCK, 300, 7)).toBeGreaterThan(0);
+  });
+
+  it('has the Shark beat it while reading ranges', () => {
+    expect(beatsAlwaysCall(SHARK, 200, 2)).toBeGreaterThan(0);
   });
 });
