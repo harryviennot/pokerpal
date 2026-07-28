@@ -6,6 +6,132 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-28 — Phase 2, slice 2: the table on screen, read-only
+
+The engine's output is now visible. A hand renders on the felt and can be stepped
+through action by action or street by street. No betting controls, no bots — the
+hand is a fixed demo script played through the real engine.
+
+| File | What |
+| --- | --- |
+| `src/engine/replay.ts` | `HandEvent[]` → one `TableSnapshot` per event |
+| `src/components/ui/ChipStack.tsx` | a wagered amount on the felt |
+| `src/components/ui/PlayingCard.tsx` | gained a face-down state and a `small` size |
+| `src/features/practice/PokerTable.tsx` | the felt, the geometry, the board and the pot |
+| `src/features/practice/TableSeat.tsx` | one player: cards, name plate, dealer button |
+| `src/features/practice/ReplayControls.tsx` | transport controls |
+| `src/features/practice/useHandReplay.ts` | the cursor into the log |
+| `src/features/practice/demoHand.ts` | the scripted hand, played through the engine |
+| `app/(calculator)/`, `app/table/` | the app gets native tabs |
+
+344 tests passing, up from 322. Typecheck and lint clean. No new dependencies.
+Exercised on the iOS 26.2 simulator in light and dark mode, stepping the demo
+hand through every street.
+
+### Decisions worth knowing about
+
+**The UI never renders a `HandState`.** It renders a `TableSnapshot`, one per
+event in the log, and "live" is simply the last frame. Stepping backwards,
+reviewing a hand from history and watching one play out are then the same code
+path, and the UI reads a flat already-resolved shape instead of asking the engine
+questions mid-render.
+
+**`replay.ts` is bookkeeping, not rules, and that is the whole point.** Legality,
+betting closure, who shows and who wins were all settled when the hand was
+played. All the reducer does is move chips between a stack, the bet in front of a
+seat, and the middle. Re-running the engine from the recorded deck would have
+been the other option, but `applyAction` deals a whole street transition in one
+call — the flop would arrive on the same frame as the last preflop call, and
+street-by-street replay is a PRD requirement.
+
+**The replay is checked against the engine, not against itself.** 400 seeded
+hands are played by a random legal-action chooser, replayed, and the final
+snapshot stacks must equal the engine's final stacks, with chips conserved on
+every intermediate frame. Anything the reducer drops or double-counts shows up
+there — the missing ante did, immediately.
+
+**`describeEvent` took an optional namer rather than growing a twin.** The engine
+does not know display names, so it numbers seats; callers that know them pass a
+function and get `Ava raises to 30`. One line of commentary, one implementation.
+
+**Seats are always in the tree, and only visible once measured.** Their positions
+come from `onLayout` rather than fixed points, so two-handed and nine-handed
+tables lay out from the same rule. Gating the render on the measurement instead
+would have kept the seats out of the accessibility tree until the second frame —
+and out of the test tree entirely, since `onLayout` never fires under Jest.
+
+**The hero is pinned to the bottom** and seats run up the right-hand side from
+there, so the table always reads from the player's own chair whatever seat they
+are in.
+
+**The table screen has an inline title, not a large one.** A large title only
+earns its space when it can collapse into a scroll; the felt does not scroll.
+
+### Traps that cost real time
+
+**Everything the simulator caught, the test suite had passed.** Three real bugs
+survived 36 green component tests, because none of them are about behaviour:
+
+1. **The floating tab bar in iOS 26 sits on top of a fixed screen.** The replay
+   controls were underneath it and unreachable. A `ScrollView` gets the inset
+   from the system via `contentInsetAdjustmentBehavior`, which is why the
+   calculator never showed it; a fixed screen has to ask `useSafeAreaInsets`.
+   `Screen` now applies the bottom inset in its non-scrolling branch, so the next
+   fixed screen gets it for free.
+2. **Hole cards rendered outside the felt**, and the top seat's were clipped off
+   the screen entirely. Seats were centred on the felt's edge to "straddle the
+   rail", which works for a name plate and not for a plate with two cards above
+   it. The seat ellipse is now inset by half a seat plus the rail.
+3. **Folded seats kept their cards**, dimmed. A folded player has no cards.
+
+**Adding `useSafeAreaInsets` to `Screen` broke every screen test at once** —
+without a provider the hook throws rather than returning zeros. The library ships
+`react-native-safe-area-context/jest/mock` for this; one `jest.mock` in
+`jest.setup.ts` beats wrapping every test in a provider.
+
+**`⏮` and the other media glyphs render as colour emoji**, not as text in the
+label colour. `↺` and the angle quotes do not.
+
+**The iOS build fails in `node_modules`, not in our code.** `expo-modules-jsi`
+57.0.4 has `abs(milliseconds) <= maxJavaScriptDateMilliseconds`, which Xcode
+26.2's Swift rejects as ambiguous. `.magnitude` compiles. There is no newer
+published version; it wants an upstream issue or a `patch-package` entry, and
+until then a fresh `npm install` re-breaks the local build.
+
+**RNTL 14's `renderHook` is async like its `render`.** Without awaiting it,
+`result` is undefined and every assertion fails on `.current` rather than on
+anything to do with the hook.
+
+**`expo run:ios` rewrites the `ios` and `android` npm scripts** to `expo run:*`
+on its first run. Harmless, but it lands in the diff of whatever branch happened
+to be checked out.
+
+**`StyleSheet.absoluteFillObject` does not exist in this typing** — it is
+`absoluteFill`, or spell the inset out.
+
+### Known gaps
+
+- **No animation.** Cards appear and chips jump. Reanimated and Skia arrive with
+  the slice that needs them, per the dependency rule.
+- **The demo hand is a fixture.** Real hands arrive with the betting controls and
+  the bots.
+- **A face-down card is a flat colour with a hairline inset**, not artwork. It is
+  honest and legible; it is not decorative.
+- **No landscape layout.** The ellipse maths handles it, the type scale does not.
+- **No real-device pass**, and none for the calculator either — still simulator
+  only. Haptics and scroll feel are exactly what a simulator misrepresents.
+- **The tab bar was only reachable by tapping**, which the simulator could not be
+  driven to do from here; the table screen was verified by temporarily pointing
+  the index route at it. The tab bar itself, both icons and both labels, is in
+  the screenshots.
+
+### Next
+
+Slice 3: betting controls — `legalActions` driving a bet slider and action
+buttons, hero acting for real. Then the bot archetypes.
+
+---
+
 ## 2026-07-28 — Phase 2, slice 1: NLHE rules engine and table session
 
 The engine now knows what a hand of poker is. Eight new modules in `src/engine/`, no new dependencies, no UI.

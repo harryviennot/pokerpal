@@ -47,36 +47,41 @@ export type LoggedAction =
   | { type: 'bet'; to: number; amount: number }
   | { type: 'raise'; to: number; amount: number };
 
+/** How a seat is referred to in commentary. Defaults to its number. */
+export type SeatNamer = (seat: SeatIndex) => string;
+
+const numberedSeat: SeatNamer = (seat) => `Seat ${seat}`;
+
 /**
  * One-line human-readable text for an event, e.g. `Seat 2 raises to 250`.
  *
- * Deliberately terse and seat-numbered rather than named: the engine does not
- * know display names, so the UI substitutes them when it has them.
+ * The engine does not know display names, so it numbers seats. Callers that do
+ * know them pass a `name` function and get `Ava raises to 250` instead.
  */
-export function describeEvent(event: HandEvent): string {
+export function describeEvent(event: HandEvent, name: SeatNamer = numberedSeat): string {
   switch (event.type) {
     case 'handStart':
-      return `Hand #${event.handNumber} begins, button on seat ${event.button}`;
+      return `Hand #${event.handNumber} begins, button on ${name(event.button)}`;
     case 'blindPosted':
-      return `Seat ${event.seat} posts ${BLIND_LABELS[event.kind]} ${event.amount}${
+      return `${name(event.seat)} posts ${BLIND_LABELS[event.kind]} ${event.amount}${
         event.allIn ? ' and is all in' : ''
       }`;
     case 'holeCardsDealt':
-      return `Seat ${event.seat} is dealt two cards`;
+      return `${name(event.seat)} is dealt two cards`;
     case 'streetDealt':
       return `${STREET_LABELS[event.street]}: ${event.cards.map(formatCard).join(' ')}`;
     case 'actionTaken':
-      return `Seat ${event.seat} ${describeAction(event.action)}${
+      return `${name(event.seat)} ${describeAction(event.action)}${
         event.allIn ? ' and is all in' : ''
       }`;
     case 'uncalledBetReturned':
-      return `${event.amount} returned to seat ${event.seat}`;
+      return `${event.amount} returned to ${name(event.seat)}`;
     case 'showdownHand':
-      return `Seat ${event.seat} shows ${event.cards.map(formatCard).join(' ')}`;
+      return `${name(event.seat)} shows ${event.cards.map(formatCard).join(' ')}`;
     case 'handMucked':
-      return `Seat ${event.seat} mucks`;
+      return `${name(event.seat)} mucks`;
     case 'potAwarded':
-      return `Seat ${event.seat} wins ${event.amount}${event.oddChip ? ' (odd chip)' : ''}`;
+      return `${name(event.seat)} wins ${event.amount}${event.oddChip ? ' (odd chip)' : ''}`;
     case 'handEnd':
       return `Hand ends on the ${event.street}`;
   }

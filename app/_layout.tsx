@@ -1,4 +1,5 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
@@ -7,9 +8,16 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerLargeTitle: true }}>
-        <Stack.Screen name="index" options={{ title: 'Calculator' }} />
-      </Stack>
+      <NativeTabs>
+        <NativeTabs.Trigger name="(calculator)">
+          <NativeTabs.Trigger.Icon sf="percent" />
+          <NativeTabs.Trigger.Label>Calculator</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="table">
+          <NativeTabs.Trigger.Icon sf="suit.spade.fill" />
+          <NativeTabs.Trigger.Label>Table</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
+      </NativeTabs>
       <StatusBar style="auto" />
     </ThemeProvider>
   );
