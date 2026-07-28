@@ -73,3 +73,72 @@ export {
 } from './ranges';
 
 export { createRng, type Rng } from './rng';
+
+export {
+  describeEvent,
+  type BlindKind,
+  type HandEvent,
+  type LoggedAction,
+  type SeatIndex,
+  type Street,
+} from './events';
+
+export {
+  activePlayers,
+  amountToCall,
+  contestingPlayers,
+  IllegalActionError,
+  InvalidTableError,
+  isHandOver,
+  nextSeat,
+  playerAt,
+  totalPot,
+  type Action,
+  type ActionType,
+  type Blinds,
+  type HandState,
+  type LegalAction,
+  type Player,
+  type PlayerStatus,
+  type Pot,
+  type TableConfig,
+} from './table';
+
+export {
+  isBettingRoundClosed,
+  isLegalAction,
+  legalActions,
+  nextToAct,
+  type BettingResult,
+} from './betting';
+
+export {
+  awardPot,
+  buildPots,
+  findUncalledBet,
+  toContribution,
+  type Award,
+  type Contribution,
+  type UncalledBet,
+} from './pots';
+
+export { resolveShowdown, type ShowdownEntry, type ShowdownResult } from './showdown';
+
+export { bigBlindSeat, dealStreet, nextStreet, openHand } from './deal';
+
+export { applyAction, dealHand, startHand } from './hand';
+
+export {
+  currentBlinds,
+  finishHand,
+  isSessionOver,
+  sessionWinner,
+  startNextHand,
+  startSession,
+  type BlindLevel,
+  type HandRecord,
+  type SessionConfig,
+  type SessionSeat,
+  type SessionState,
+  type TableStyle,
+} from './session';
