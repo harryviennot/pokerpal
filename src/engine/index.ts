@@ -80,6 +80,7 @@ export {
   type HandEvent,
   type LoggedAction,
   type SeatIndex,
+  type SeatNamer,
   type Street,
 } from './events';
 
@@ -127,6 +128,16 @@ export { resolveShowdown, type ShowdownEntry, type ShowdownResult } from './show
 export { bigBlindSeat, dealStreet, nextStreet, openHand } from './deal';
 
 export { applyAction, dealHand, startHand } from './hand';
+
+export {
+  replayHand,
+  snapshotPot,
+  snapshotToCall,
+  type ReplayFrame,
+  type ReplayInput,
+  type ReplaySeat,
+  type TableSnapshot,
+} from './replay';
 
 export {
   currentBlinds,

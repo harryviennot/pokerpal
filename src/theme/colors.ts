@@ -33,8 +33,16 @@ export interface ColorTokens {
   warning: string;
   /** Poker table felt. Dark in both schemes — the table is always a dark canvas. */
   felt: string;
+  /** The rail around the felt. Darker than the felt, never a border line. */
+  feltRail: string;
+  /** Text and chrome drawn on the felt, which is dark in both schemes. */
+  onFelt: string;
   /** Card face background on the table and in the picker. */
   cardFace: string;
+  /** Card back, for hole cards nobody has shown. */
+  cardBack: string;
+  /** Chip discs in a stack. */
+  chip: string;
   /** Red suits (hearts, diamonds). */
   suitRed: string;
   /** Black suits (clubs, spades). */
@@ -54,7 +62,11 @@ const light: ColorTokens = {
   danger: '#FF3B30',
   warning: '#FF9500',
   felt: '#0B6B3A',
+  feltRail: '#08301D',
+  onFelt: '#FFFFFF',
   cardFace: '#FFFFFF',
+  cardBack: '#2C3E66',
+  chip: '#E8ECF2',
   suitRed: '#D7263D',
   suitBlack: '#1C1C1E',
 };
@@ -72,7 +84,11 @@ const dark: ColorTokens = {
   danger: '#FF453A',
   warning: '#FF9F0A',
   felt: '#08492A',
+  feltRail: '#04180F',
+  onFelt: '#FFFFFF',
   cardFace: '#F5F5F7',
+  cardBack: '#232D4B',
+  chip: '#D5DAE3',
   suitRed: '#E5384C',
   suitBlack: '#1C1C1E',
 };
