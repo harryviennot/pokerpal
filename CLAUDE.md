@@ -123,6 +123,7 @@ Trunk-based development with short-lived feature branches. `main` is protected a
 
 ## How to work in this repo (for Claude)
 
+0. Read `docs/project-log.md` first. It records what has already been built, the decisions behind it, and the traps that have already cost time. Add an entry there when you finish a meaningful chunk of work.
 1. Read the relevant PRD section before implementing a feature; respect its acceptance criteria.
 2. Plan before coding on anything non-trivial: list the files you will touch and the components you will reuse. Prefer editing existing files over creating new ones.
 3. Search for existing components, hooks, and engine functions before writing new ones.
