@@ -42,6 +42,8 @@ export interface ReplaySeat {
   won: number;
   /** The made hand shown down, when it was shown. */
   rank: HandRank | null;
+  /** The five cards that played, once shown. Null for hands logged before it existed. */
+  bestFive: readonly Card[] | null;
 }
 
 export interface TableSnapshot {
@@ -150,6 +152,7 @@ function initialSnapshot(seats: ReplayInput['seats']): TableSnapshot {
       mucked: false,
       won: 0,
       rank: null,
+      bestFive: null,
     })),
     pot: 0,
     actor: null,
@@ -216,6 +219,7 @@ function applyEvent(snapshot: TableSnapshot, event: HandEvent): TableSnapshot {
         holeCards: event.cards,
         shown: true,
         rank: event.rank,
+        bestFive: event.bestFive ?? null,
       }));
 
     case 'handMucked':

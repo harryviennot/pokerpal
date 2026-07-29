@@ -15,7 +15,7 @@ export interface PlayingCardProps {
   focused?: boolean;
   /** Renders the back of the card. A face-down card never reveals `card`. */
   faceDown?: boolean;
-  /** Fades the card out — a folded seat, or a hand that lost at showdown. */
+  /** Greys the card out — one that is not part of the winning five at showdown. */
   dimmed?: boolean;
   onPress?: () => void;
   accessibilityLabel?: string;
@@ -24,13 +24,18 @@ export interface PlayingCardProps {
 const DIMENSIONS: Record<PlayingCardSize, { width: number; height: number }> = {
   small: { width: 30, height: 42 },
   medium: { width: 44, height: 62 },
-  large: { width: 56, height: 78 },
+  large: { width: 60, height: 84 },
 };
 
-const RANK_VARIANT = { small: 'footnote', medium: 'title3', large: 'title2' } as const;
-const SUIT_VARIANT = { small: 'caption', medium: 'footnote', large: 'headline' } as const;
+const RANK_VARIANT = { small: 'footnote', medium: 'title3', large: 'title1' } as const;
+const SUIT_VARIANT = { small: 'footnote', medium: 'title3', large: 'title2' } as const;
 
-/** A single card: face up, face down, or a dashed placeholder when empty. */
+/**
+ * A single card: face up, face down, or a dashed placeholder when empty.
+ *
+ * The face is the two-index design from the table art: the rank in the top
+ * left corner and one large suit pip in the bottom right, nothing else.
+ */
 export function PlayingCard({
   card,
   size = 'medium',
@@ -43,11 +48,16 @@ export function PlayingCard({
   const { colors } = useTheme();
   const { width, height } = DIMENSIONS[size];
   const isEmpty = card === undefined && !faceDown;
+  const face = dimmed ? colors.cardFaceDimmed : colors.cardFace;
+  const glyph = {
+    color: suitColor(card, colors.suitRed, colors.suitBlack),
+    opacity: dimmed ? 0.55 : 1,
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? describe(card, faceDown)}
+      accessibilityLabel={accessibilityLabel ?? describe(card, faceDown, dimmed)}
       accessibilityState={{ selected: focused }}
       onPress={onPress}
       disabled={!onPress}
@@ -55,31 +65,31 @@ export function PlayingCard({
         styles.base,
         { width, height, borderRadius: radius.sm },
         isEmpty && { borderWidth: 2, borderStyle: 'dashed', borderColor: colors.separator },
-        !isEmpty && { backgroundColor: faceDown ? colors.cardBack : colors.cardFace },
+        !isEmpty && { backgroundColor: faceDown ? colors.cardBack : face },
         focused && { borderWidth: 2, borderStyle: 'solid', borderColor: colors.tint },
-        dimmed && styles.dimmed,
         pressed && styles.pressed,
       ]}>
-      {faceDown && <View style={[styles.backPattern, { borderColor: colors.chip }]} />}
+      {faceDown && (
+        <>
+          <View style={[styles.backBorder, { borderColor: colors.cardBackAccent }]} />
+          <View style={[styles.backLozenge, { backgroundColor: colors.cardBackAccent }]} />
+        </>
+      )}
       {card !== undefined && !faceDown && (
-        <View style={styles.face}>
-          <Text
-            variant={RANK_VARIANT[size]}
-            style={{ color: suitColor(card, colors.suitRed, colors.suitBlack) }}>
+        <>
+          <Text variant={RANK_VARIANT[size]} style={[styles.rank, glyph]}>
             {formatRank(rankOf(card))}
           </Text>
-          <Text
-            variant={SUIT_VARIANT[size]}
-            style={{ color: suitColor(card, colors.suitRed, colors.suitBlack) }}>
+          <Text variant={SUIT_VARIANT[size]} style={[styles.suit, glyph]}>
             {suitSymbol(suitOf(card))}
           </Text>
-        </View>
+        </>
       )}
     </Pressable>
   );
 }
 
-function describe(card: Card | undefined, faceDown: boolean): string {
+function describe(card: Card | undefined, faceDown: boolean, dimmed: boolean): string {
   if (faceDown) {
     return 'Face-down card';
   }
@@ -88,11 +98,15 @@ function describe(card: Card | undefined, faceDown: boolean): string {
     return 'Empty card slot';
   }
 
-  return `${formatRank(rankOf(card))} of ${suitName(card)}`;
+  const name = `${formatRank(rankOf(card))} of ${suitName(card)}`;
+
+  // A dimmed card is one outside the winning five; say so rather than hoping
+  // a sighted-only style carries the meaning.
+  return dimmed ? `${name}, does not play` : name;
 }
 
-function suitColor(card: Card, red: string, black: string): string {
-  return isRedSuit(suitOf(card)) ? red : black;
+function suitColor(card: Card | undefined, red: string, black: string): string {
+  return card !== undefined && isRedSuit(suitOf(card)) ? red : black;
 }
 
 function suitName(card: Card): string {
@@ -103,24 +117,39 @@ function suitName(card: Card): string {
 
 const styles = StyleSheet.create({
   base: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  face: {
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-  },
-  // A single inset hairline reads as a card back at any size without turning
-  // into decoration that competes with the faces beside it.
-  backPattern: {
+  rank: {
     position: 'absolute',
-    inset: 4,
-    borderWidth: 1,
-    borderRadius: radius.sm - 4,
-    opacity: 0.35,
+    top: spacing.xs / 2,
+    left: spacing.xs,
+    fontWeight: '700',
   },
-  dimmed: {
-    opacity: 0.45,
+  suit: {
+    position: 'absolute',
+    bottom: spacing.xs / 2,
+    right: spacing.xs,
+  },
+  // The back: an inset border and a small lozenge, legible at every size
+  // without becoming artwork that competes with the faces beside it.
+  backBorder: {
+    position: 'absolute',
+    inset: 3,
+    borderWidth: 1.5,
+    borderRadius: radius.sm - 3,
+    opacity: 0.9,
+  },
+  backLozenge: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 10,
+    height: 10,
+    marginTop: -5,
+    marginLeft: -5,
+    borderRadius: radius.sm / 4,
+    transform: [{ rotate: '45deg' }],
+    opacity: 0.9,
   },
   pressed: {
     opacity: 0.6,

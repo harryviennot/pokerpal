@@ -8,6 +8,15 @@
  *
  * @type {import('jest').Config}
  */
+const expoPreset = require('jest-expo/ios/jest-preset');
+
+// Setting `setupFiles` or `transformIgnorePatterns` here REPLACES the
+// jest-expo preset's values, so both are extended from the preset instead of
+// copied: Skia ships untranspiled ESM and registers its own web-based mock.
+const transformIgnorePatterns = expoPreset.transformIgnorePatterns.map((pattern) =>
+  pattern.replace('|standard-navigation))', '|standard-navigation|@shopify/react-native-skia))'),
+);
+
 module.exports = {
   projects: [
     {
@@ -32,6 +41,9 @@ module.exports = {
         '<rootDir>/app/**/*.test.tsx',
       ],
       testPathIgnorePatterns: ['<rootDir>/src/engine/', '<rootDir>/src/utils/'],
+      setupFiles: [...expoPreset.setupFiles, '@shopify/react-native-skia/jestSetup.js'],
+      transformIgnorePatterns,
+      resolver: '<rootDir>/jest.resolver.js',
       setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',

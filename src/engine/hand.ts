@@ -186,7 +186,13 @@ function finish(state: HandState): HandState {
       events.push(
         entry.mucked
           ? { type: 'handMucked', seat: entry.seat }
-          : { type: 'showdownHand', seat: entry.seat, cards: entry.cards, rank: entry.rank },
+          : {
+              type: 'showdownHand',
+              seat: entry.seat,
+              cards: entry.cards,
+              rank: entry.rank,
+              bestFive: entry.bestFive,
+            },
       );
     }
 

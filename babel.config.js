@@ -5,5 +5,9 @@ module.exports = function (api) {
 
   return {
     presets: ['babel-preset-expo'],
+    // Reanimated 4 worklets. babel-preset-expo adds this on Metro when the
+    // package is installed, but babel-jest reads this file directly, so it
+    // must be explicit — and last.
+    plugins: ['react-native-worklets/plugin'],
   };
 };

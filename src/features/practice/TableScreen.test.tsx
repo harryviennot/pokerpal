@@ -160,6 +160,21 @@ describe('TableScreen', () => {
     expect(screen.queryByText(/equity/)).not.toBeOnTheScreen();
   });
 
+  it('captions the hero hand while it is live and banners the winner after', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+
+    // Preflop the caption reads the hole cards alone: a pocket pair or a high card.
+    expect(screen.getByText(/^(Pair of|.+ high$)/)).toBeOnTheScreen();
+
+    await user.press(screen.getByLabelText('Fold'));
+
+    // The hero folded, so somebody else took the pot without a showdown.
+    expect(screen.getByText(/wins/)).toBeOnTheScreen();
+    expect(screen.queryByText(/^(Pair of|.+ high$)/)).not.toBeOnTheScreen();
+  });
+
   it('steps back through the hand once it is finished', async () => {
     const user = setupUser();
 

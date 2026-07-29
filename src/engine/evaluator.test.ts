@@ -1,6 +1,7 @@
 import { allCards, parseCards, type Card } from './cards';
 import { createDeck, shuffle } from './deck';
 import {
+  bestFive,
   categoryName,
   categoryOf,
   compareHands,
@@ -219,5 +220,65 @@ describe('categoryName', () => {
     expect(categoryName(HandCategory.StraightFlush)).toBe('Straight flush');
     expect(categoryName(HandCategory.TwoPair)).toBe('Two pair');
     expect(categoryName(HandCategory.HighCard)).toBe('High card');
+  });
+});
+
+describe('bestFive', () => {
+  const sorted = (cards: readonly Card[]): Card[] => [...cards].sort((a, b) => a - b);
+
+  it('returns a five-card hand untouched', () => {
+    const cards = hand('Ac Jd 8h 5s 2d');
+
+    expect(bestFive(cards)).toEqual(cards);
+  });
+
+  it('keeps the full house and drops the higher board kicker', () => {
+    // Nines full of fours beats any ace kicker line.
+    const seven = hand('9c 9d 9h 4s 4d Ac Kd');
+
+    expect(sorted(bestFive(seven))).toEqual(sorted(hand('9c 9d 9h 4s 4d')));
+  });
+
+  it('keeps the five highest cards of the flush suit', () => {
+    const seven = hand('Ah Jh 8h 5h 2h Kc Qd');
+
+    expect(sorted(bestFive(seven))).toEqual(sorted(hand('Ah Jh 8h 5h 2h')));
+  });
+
+  it('includes the ace in a wheel', () => {
+    const seven = hand('Ac 2d 3h 4s 5c Kd Qh');
+
+    expect(sorted(bestFive(seven))).toEqual(sorted(hand('Ac 2d 3h 4s 5c')));
+  });
+
+  it('keeps the right kicker with two pair', () => {
+    const seven = hand('Jc Jd 4h 4s Ad 9c 2h');
+
+    expect(sorted(bestFive(seven))).toEqual(sorted(hand('Jc Jd 4h 4s Ad')));
+  });
+
+  it('handles six cards', () => {
+    const six = hand('Tc Td 8h 5s 2d Ac');
+
+    expect(sorted(bestFive(six))).toEqual(sorted(hand('Tc Td 8h 5s Ac')));
+  });
+
+  it('always returns a subset with the same value as the whole hand', () => {
+    const rng = createRng(7);
+    const deck = shuffle(createDeck(), rng);
+
+    for (let start = 0; start + 7 <= 49; start += 7) {
+      const seven = deck.slice(start, start + 7);
+      const five = bestFive(seven);
+
+      expect(five).toHaveLength(5);
+      expect(five.every((card) => seven.includes(card))).toBe(true);
+      expect(handValue(five)).toBe(handValue(seven));
+    }
+  });
+
+  it('rejects fewer than five or more than seven cards', () => {
+    expect(() => bestFive(hand('Ac Kd Qh Js'))).toThrow(RangeError);
+    expect(() => bestFive(hand('Ac Kd Qh Js Tc 9d 8h 7s'))).toThrow(RangeError);
   });
 });
