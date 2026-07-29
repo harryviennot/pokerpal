@@ -6,6 +6,90 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Table redesign: the capsule felt, seats with faces, and a real showdown
+
+The table screen now looks like a poker app instead of a wireframe, modeled on
+reference screenshots: a portrait capsule table with a dark rim and radial-lit
+teal felt (Skia), seat pills with initial avatars and tucked card backs, a
+"Pot total" readout, two-corner card faces, chip-disc bets, a winner
+presentation (gold glow, crown, `+N`, banner, non-playing cards dimmed) and a
+live made-hand caption under the hero's fanned cards. First motion in the app:
+deal/pop springs, bet chips zooming in and fading to the pot, a pot pulse and
+the winner glow — all through named spring presets in `theme/motion.ts`,
+all instant under reduce-motion.
+
+| File | What |
+| --- | --- |
+| `src/components/table/` | `PokerTable` split into `TableFelt` (Skia), `TableCenter`, `TableSeat`, `SeatPill`, `SeatAvatar`, `TableBet`, `WinnerBanner`, `DealIn`, `useSeatGeometry`, `winnerSummary` |
+| `src/engine/evaluator.ts` | `bestFive`: the five cards that play, for showdown highlighting |
+| `src/engine/describeRank.ts` | `describeHandRank` / `describeMadeHand` copy ("Nines full of fours") |
+| `src/engine/{showdown,events,hand,replay}.ts` | `bestFive` threaded to `ReplaySeat`; optional on the event so archived hands replay as null |
+| `src/components/ui/{PlayingCard,ChipStack}.tsx` | two-corner faces, live `dimmed`, real card back; one chip disc over the amount |
+| `src/theme/{colors,motion}.ts` | felt/rim/pill/winner/card tokens; spring presets |
+| `src/hooks/useMotionPrefs.ts` | the one place that asks about reduced motion |
+
+Two new dependencies, the ones CLAUDE.md and the PRD name for exactly this
+slice: `@shopify/react-native-skia` (the felt) and `react-native-reanimated`
+(+`react-native-worklets`).
+
+Rebased onto slices 4 and 5, which moved the table to `src/components/table/`
+on its second consumer. The redesign landed there rather than in the practice
+feature, so the tracker's `HandReplayScreen` inherits all of it — a stored hand
+now replays onto the new felt, with the winner banner and the dimmed
+non-playing cards appearing at its showdown frames.
+
+### Decisions worth knowing about
+
+**`bestFive` rides the event log, not the UI.** The evaluator's packed score
+cannot say *which* five cards won, so `bestFive` brute-forces the ≤21 subsets
+on the display path and `resolveShowdown` stamps it into `showdownHand`
+events. The field is optional there and `ReplaySeat.bestFive` is null for
+hands archived before it existed — an empty `winningFive` set dims nothing
+rather than crashing a legacy replay.
+
+**Dimming talks, not just fades.** A card outside the winning five renders on
+a grey face *and* appends ", does not play" to its accessibility label. The
+first plan — `accessibilityState.disabled` — was ambiguous because every
+non-pressable card already reads disabled from its `Pressable`.
+
+**The hero seat is the same component.** `revealed` switches a seat from
+avatar-plus-backs to large fanned face-up cards and the made-hand caption;
+there is no `HeroSeat` fork to drift.
+
+### Traps
+
+- **Mocking reanimated in `jest.setup.ts` needs `__esModule: true` and an
+  explicit `default`.** Both are non-enumerable on the real module, so a
+  spread drops them, babel's interop then hands components the whole module
+  as `Animated`, and every `Animated.View` renders as undefined. The failure
+  names the innocent parent component, not the import.
+- **jest-expo and react-native-worklets both want Jest's `resolver` slot.**
+  `jest.resolver.js` composes them (worklets strips `.native` so its JS
+  implementation loads); overriding `transformIgnorePatterns` or `setupFiles`
+  likewise *replaces* the preset's values, so both are extended from
+  `jest-expo/ios/jest-preset` programmatically instead of copied.
+- **RNTL normalizes `formatChips`'s narrow no-break space to a plain space**
+  in label queries — expectations must write `1 000` with a plain space, not the invisible U+202F character itself.
+- **`toHaveAccessibilityState` is gone from RNTL v13**; assert on
+  `accessibilityState` props or, better, put the state in the label.
+
+### Known gaps
+
+- The bet chip fades out when the street ends rather than flying its path to
+  the pot; a bespoke flight needs per-seat vectors through a custom exiting
+  worklet and wasn't worth it yet.
+- The hero's own winning seat shows the gold pill and `+N` but no crown — the
+  crown lives on the avatar, which the hero seat doesn't render.
+- No real-device pass yet. Springs, the Skia felt, shadow glow and haptics
+  all misrepresent on the simulator; CLAUDE.md's PR rule 3 applies before
+  merge.
+- `ActionBar` still hand-rolls its buttons. Slice 4 added
+  `components/ui/Button`, but it is single-line and one tone, where these are
+  a verb over an amount in two tones. Widening the design-system button is its
+  own change, not one to smuggle into a rebase.
+
+---
+
 ## 2026-07-29 — Phase 3, slice 5: the leak dashboard and the trend that earns itself
 
 The History tab became the dashboard the PRD asks for: mistakes per hundred
