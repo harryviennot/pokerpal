@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react-native';
 
-import { DEMO_HAND } from './demoHand';
+import { DEMO_HAND } from '@/fixtures/demoHand';
+
 import { useHandReplay } from './useHandReplay';
 
 afterEach(async () => {

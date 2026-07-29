@@ -6,60 +6,11 @@
  * module exists — the same posture the project log records for the formSheet.
  */
 
-import {
-  applyAction,
-  createRng,
-  legalActions,
-  startHand,
-  type Action,
-  type DecisionFacts,
-  type DecisionReview,
-  type HandEvent,
-} from '@/engine';
+import { type DecisionFacts, type DecisionReview } from '@/engine';
+import { playHand } from '@/fixtures/playedHand';
 
 import { createMemoryHandHistoryRepo } from './memoryRepo';
 import { PersistenceError, type HandHistoryRepo, type NewHandRecord } from './repo';
-
-/** A real hand played through the engine, so events round-trip deck and all. */
-function playHand(seed: number): readonly HandEvent[] {
-  let state = startHand(
-    {
-      seats: [
-        { id: 'You', stack: 1000 },
-        { id: 'Ava', stack: 1000 },
-        { id: 'Ben', stack: 1000 },
-      ],
-      button: 0,
-      blinds: { smallBlind: 5, bigBlind: 10 },
-      handNumber: 1,
-      seed,
-    },
-    createRng(seed),
-  );
-
-  for (let step = 0; step < 200 && !state.complete; step++) {
-    state = applyAction(state, firstLegal(state));
-  }
-
-  return state.events;
-}
-
-function firstLegal(state: Parameters<typeof legalActions>[0]): Action {
-  const legal = legalActions(state)[0];
-
-  if (!legal) {
-    throw new Error('A live hand must offer an action.');
-  }
-
-  switch (legal.type) {
-    case 'bet':
-      return { type: 'bet', to: legal.min };
-    case 'raise':
-      return { type: 'raise', to: legal.min };
-    default:
-      return { type: legal.type };
-  }
-}
 
 const FACTS: DecisionFacts = {
   street: 'preflop',
@@ -88,6 +39,8 @@ function review(overrides: Partial<DecisionReview> = {}): DecisionReview {
 }
 
 function hand(sessionId: number, overrides: Partial<NewHandRecord> = {}): NewHandRecord {
+  const played = playHand(overrides.seed ?? 42);
+
   return {
     sessionId,
     handNumber: 1,
@@ -95,12 +48,8 @@ function hand(sessionId: number, overrides: Partial<NewHandRecord> = {}): NewHan
     seed: 42,
     button: 0,
     blinds: { smallBlind: 5, bigBlind: 10 },
-    seats: [
-      { id: 'You', stack: 1000 },
-      { id: 'Ava', stack: 1000 },
-      { id: 'Ben', stack: 1000 },
-    ],
-    events: playHand(overrides.seed ?? 42),
+    seats: played.seats,
+    events: played.events,
     heroNet: -10,
     reviews: [review()],
     ...overrides,
@@ -191,6 +140,23 @@ function describeHandHistoryRepo(name: string, makeRepo: () => HandHistoryRepo):
       expect(stored?.reviews).toEqual(record.reviews);
       expect(stored?.blinds).toEqual(record.blinds);
       expect(stored?.evLost).toBe(30);
+      expect(stored?.heroSeat).toBe(SESSION.heroSeat);
+    });
+
+    it("reports the hero's seat from the hand's own session", async () => {
+      // Two sessions with different hero seats: the only way to pass is to read
+      // the seat off the session this hand belongs to. A hardcoded 0 fails, and
+      // so does joining the wrong row.
+      const first = await repo.createSession({ ...SESSION, heroSeat: 0 });
+      const second = await repo.createSession({ ...SESSION, heroSeat: 2 });
+
+      await repo.saveHand(hand(first, { handNumber: 1, playedAt: 1_000 }));
+      await repo.saveHand(hand(second, { handNumber: 1, playedAt: 2_000 }));
+
+      const listed = await repo.listHands();
+
+      expect(await repo.getHand(listed[0]?.id ?? -1)).toMatchObject({ heroSeat: 2 });
+      expect(await repo.getHand(listed[1]?.id ?? -1)).toMatchObject({ heroSeat: 0 });
     });
 
     it('returns null for a hand that does not exist', async () => {

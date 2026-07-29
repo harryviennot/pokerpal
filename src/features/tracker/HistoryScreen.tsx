@@ -1,13 +1,11 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
-import { Text } from '@/components/ui/Text';
-import { useTheme } from '@/hooks/useTheme';
-import { MIN_TOUCH_TARGET, radius, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
 
 import { HandHistoryRow } from './HandHistoryRow';
@@ -38,24 +36,17 @@ export function HistoryScreen() {
 
   if (state.status === 'error') {
     return (
-      <Screen center>
-        <Text variant="headline">History is unavailable</Text>
-        <Text variant="subheadline" tone="secondaryLabel" style={styles.centered}>
-          Something went wrong reading your saved hands.
-        </Text>
-        <RetryButton onPress={reload} />
-      </Screen>
+      <EmptyState
+        title="History is unavailable"
+        message="Something went wrong reading your saved hands."
+        action={{ label: 'Try again', onPress: reload }}
+      />
     );
   }
 
   if (state.hands.length === 0) {
     return (
-      <Screen center>
-        <Text variant="headline">No hands yet</Text>
-        <Text variant="subheadline" tone="secondaryLabel" style={styles.centered}>
-          Play a hand at the table and it lands here.
-        </Text>
-      </Screen>
+      <EmptyState title="No hands yet" message="Play a hand at the table and it lands here." />
     );
   }
 
@@ -75,45 +66,15 @@ export function HistoryScreen() {
 
       <Section title="Hands">
         {state.hands.map((hand) => (
-          <HandHistoryRow key={hand.id} hand={hand} />
+          <HandHistoryRow
+            key={hand.id}
+            hand={hand}
+            onPress={() =>
+              router.push({ pathname: '/history/[id]', params: { id: String(hand.id) } })
+            }
+          />
         ))}
       </Section>
     </Screen>
   );
 }
-
-function RetryButton({ onPress }: { onPress: () => void }) {
-  const { colors } = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Try again"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.retry,
-        { backgroundColor: colors.tint },
-        pressed && styles.pressed,
-      ]}>
-      <Text variant="headline" style={{ color: colors.cardFace }}>
-        Try again
-      </Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  centered: {
-    textAlign: 'center',
-  },
-  retry: {
-    minHeight: MIN_TOUCH_TARGET,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.sm,
-    marginTop: spacing.sm,
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-});

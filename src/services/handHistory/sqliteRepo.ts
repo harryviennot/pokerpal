@@ -34,6 +34,7 @@ interface HandSummaryRow {
 interface HandRow extends HandSummaryRow {
   seed: number;
   button: number;
+  hero_seat: number;
   small_blind: number;
   big_blind: number;
   ante: number | null;
@@ -129,11 +130,16 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
 
     getHand: (id) =>
       guard('read', async () => {
+        // `s.hero_seat`, never `s.*`: sessions carries its own id, seed and
+        // blinds, and SQLite resolves duplicate result names last-wins — a star
+        // here would silently overwrite the hand's with the session's.
         const row = await db.getFirstAsync<HandRow>(
-          `SELECT h.*,
+          `SELECT h.*, s.hero_seat,
                   (SELECT COUNT(*) FROM decision_reviews r WHERE r.hand_id = h.id) AS decisions_graded,
                   (SELECT COALESCE(SUM(r.ev_loss), 0) FROM decision_reviews r WHERE r.hand_id = h.id) AS ev_lost
-           FROM hands h WHERE h.id = ?`,
+           FROM hands h
+           JOIN sessions s ON s.id = h.session_id
+           WHERE h.id = ?`,
           id,
         );
 
@@ -156,6 +162,7 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
           ...toSummary(row),
           seed: row.seed,
           button: row.button,
+          heroSeat: row.hero_seat,
           blinds,
           // The JSON came out of these exact types on the way in; validating
           // the whole event union at runtime is not this slice.

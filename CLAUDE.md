@@ -40,16 +40,18 @@ Definition of done for every task: typecheck, lint, and tests all pass. Run them
 1. `src/engine/` - pure TypeScript poker domain: cards, deck, hand evaluation, Monte Carlo equity, rules engine, bot decision logic, settlement math. Zero imports from React, Expo, or any I/O. Deterministic when given a seeded RNG. This is the most valuable code in the repo; it is shared by the calculator, bots, coach, and tracker.
 2. `src/services/` - I/O and side effects: Supabase client, repositories over SQLite, the coach LLM client, camera/ML inference. No React.
 3. `src/features/` - one folder per product pillar (`odds`, `practice`, `coach`, `learn`, `friends`, `ledger`, `tracker`). Each contains its screens' components, hooks, and store. Features may import engine and services, never each other's internals; anything shared by two features moves down or into `src/components`.
-4. `src/components/ui/` - dumb, reusable design-system components (Button, Card, Sheet, StatRow, PlayingCard, ChipStack). Props in, pixels out. No stores, no services.
+4. `src/components/` - dumb, reusable components. Props in, pixels out. No stores, no services.
+   - `ui/` is the design system, described in design vocabulary: Button, Card, Sheet, StatRow, PlayingCard, ChipStack. Keep it scannable — it is the first place anyone looks before writing a component.
+   - `<domain>/` folders hold components shared by two features that render an engine type rather than a design idea: `table/` (a `TableSnapshot`), `coach/` (a `DecisionReview`). A new folder needs a second consumer first; one anticipated caller is not two.
 5. `app/` - expo-router route files. Thin: compose a feature screen, nothing else. No business logic in route files, ever.
 
-Also: `src/theme/` (design tokens), `src/hooks/` (generic hooks), `src/utils/` (pure helpers), `docs/` (PRD and ADRs).
+Also: `src/theme/` (design tokens), `src/hooks/` (generic hooks, plus hooks shared by two features), `src/utils/` (pure helpers), `src/fixtures/` (shared test data built through the engine, never imported by production code), `docs/` (PRD and ADRs).
 
 ### Rules
 
 - Single Responsibility: one component, hook, or module does one thing. If a file needs "and" to describe it, split it.
 - Hard cap: no file above 400 lines. Soft target: components under 150, hooks under 100. Hitting the cap means extract, not squeeze.
-- No duplication: before writing a component, check `src/components/ui` and the feature folder for an existing one. Extend via props/variants instead of copying. Third similar block of JSX or logic means extract a shared component or hook.
+- No duplication: before writing a component, check `src/components/` and the feature folder for an existing one. Extend via props/variants instead of copying. Third similar block of JSX or logic means extract a shared component or hook.
 - Logic lives in hooks or the engine; components render. A component with a `useEffect` doing business logic is a smell: move it.
 - One exported component per component file. Named exports everywhere; default exports only where expo-router requires them.
 - The engine never knows about the UI, the network, or the database. If you are about to import something impure into `src/engine`, stop and invert the dependency.

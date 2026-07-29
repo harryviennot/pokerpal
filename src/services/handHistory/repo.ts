@@ -57,6 +57,12 @@ export interface StoredHandSummary {
 export interface StoredHand extends StoredHandSummary {
   seed: number;
   button: SeatIndex;
+  /**
+   * The seat the player occupied, taken from the hand's own session. The felt
+   * rotates to it and turns its cards face up, so a hand cannot be replayed
+   * without it.
+   */
+  heroSeat: SeatIndex;
   blinds: Blinds;
   seats: readonly { id: string; stack: number }[];
   events: readonly HandEvent[];

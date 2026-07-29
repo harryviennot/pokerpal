@@ -132,6 +132,7 @@ export { applyAction, dealHand, startHand } from './hand';
 
 export {
   replayHand,
+  reviewsByFrame,
   snapshotPot,
   snapshotToCall,
   type ReplayFrame,
