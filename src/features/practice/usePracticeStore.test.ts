@@ -6,9 +6,13 @@ import {
   type HandHistoryRepo,
 } from '@/services/handHistory';
 
+import { DEFAULT_SETUP } from './tableSetup';
 import { HERO_SEAT, usePracticeStore } from './usePracticeStore';
 
 const read = () => usePracticeStore.getState();
+
+/** The table these assertions were written against. */
+const SEED = 20260728;
 
 /**
  * Plays the hero as a calling station, taking the action from the engine rather
@@ -23,7 +27,7 @@ function heroCalls(): void {
 }
 
 beforeEach(() => {
-  read().reset();
+  read().reset(SEED);
 });
 
 describe('usePracticeStore', () => {
@@ -208,9 +212,50 @@ describe('usePracticeStore', () => {
 
     const first = read().hand.events;
 
-    read().reset();
+    read().reset(SEED);
     read().act({ type: 'call' });
 
     expect(read().hand.events).toEqual(first);
+  });
+
+  it('seats the table the player configured', () => {
+    read().configure({ ...DEFAULT_SETUP, opponents: 2, startingStack: 2_500 }, SEED);
+
+    const { hand, handSeats, setup } = read();
+
+    expect(setup.opponents).toBe(2);
+    expect(hand.players).toHaveLength(3);
+    expect(handSeats.map((seat) => seat.id)).toEqual(['You', 'Ava', 'Ben']);
+    expect(handSeats.every((seat) => seat.stack === 2_500)).toBe(true);
+  });
+
+  it('plays the archetypes the player picked, not the ones it started with', () => {
+    // A table of stations never folds, so every seat sees the flop; the default
+    // mixed table does not. If the bots came from a module constant rather than
+    // the setup, this would deal the same hand as the default.
+    read().configure({ ...DEFAULT_SETUP, mix: 'callingStation' }, SEED);
+    heroCalls();
+
+    const stations = read().hand.events;
+
+    read().configure({ ...DEFAULT_SETUP, mix: 'rock' }, SEED);
+    heroCalls();
+
+    expect(read().hand.events).not.toEqual(stations);
+  });
+
+  it('carries the chosen stakes into the hand and its archive', () => {
+    read().configure({ ...DEFAULT_SETUP, blinds: { smallBlind: 25, bigBlind: 50 } }, SEED);
+
+    expect(read().hand.blinds).toEqual({ smallBlind: 25, bigBlind: 50 });
+  });
+
+  it('deals a different table from a different seed', () => {
+    const first = read().hand.events;
+
+    read().reset(SEED + 1);
+
+    // Otherwise every launch would deal the same session, forever.
+    expect(read().hand.events).not.toEqual(first);
   });
 });

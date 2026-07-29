@@ -87,6 +87,94 @@ there is no `HeroSeat` fork to drift.
   `components/ui/Button`, but it is single-line and one tone, where these are
   a verb over an amount in two tones. Widening the design-system button is its
   own change, not one to smuggle into a rebase.
+## 2026-07-29 — Phase 2, slice 6: the player chooses the table
+
+Pillar B had an unmet acceptance criterion hiding in plain sight: *"Configurable
+table: number of bots, starting stacks, blind levels, cash-game style (rebuy
+allowed) or sit-and-go style."* The engine has supported every word of that since
+the rules engine landed — `SessionConfig` already had `seats`, `style`, `levels`
+and `rebuyTo`. It was all frozen into one constant in the practice store, with
+three separate comments promising "the table-configuration slice". This is it.
+
+| File | What |
+| --- | --- |
+| `src/features/practice/tableSetup.ts` | `TableSetup`, the mixes, the options, and `toSessionConfig` |
+| `src/features/practice/TableSetupScreen.tsx` | the sheet: opponents, who they are, stakes, stack, style |
+| `src/features/practice/TableSetupLink.tsx` | the way in, from the felt's navigation bar |
+| `src/features/practice/usePracticeStore.ts` | `setup` state, `configure`, and bots built from the chosen table |
+| `app/table/setup.tsx`, `app/table/_layout.tsx` | a second formSheet over the felt |
+
+526 tests passing, up from 508. Typecheck and lint clean. No new dependencies —
+the pickers and the toggle are `@expo/ui`, which was already installed.
+
+### Decisions worth knowing about
+
+**A table of one archetype is a drill, not a novelty.** The mix options are
+`mixed` plus each named archetype filling every seat, because "a table of calling
+stations" is how you practise value betting and "a table of rocks" is how you
+practise stealing. That is also where the difficulty ladder went: a table of
+Sharks is the hard game, and it needs no separate Easy/Medium/Hard dial on top.
+
+**Two bugs fell out of the store change, both real.** The bot policies were a
+module constant built from the frozen table, so `reset(config)` with a different
+table would have seated the wrong bots — silently, since a bot is just a
+function. And the seed was the literal `20260728`, which means **every launch
+dealt the identical session**: same cards, same opponents, same decisions. Both
+are fixed by the same move — the setup is state, and the session is built from
+it. There is now a test asserting that two seeds deal different hands, and one
+asserting that the archetypes actually change what happens at the table.
+
+**The seed is the clock, and the tests say so out loud.** Pinning a seed was
+doing double duty: it made the tests deterministic *and* it froze the product.
+The store now seeds from `Date.now()` and the tests pass `SEED` explicitly, which
+is what they always meant. Every seed is still recorded with its session and its
+hands, so a table is replayable after the fact — it is just no longer replayed by
+accident.
+
+**`toSessionConfig` drops `rebuyTo` for a sit-and-go whatever the toggle says.**
+Buying back in is exactly what makes it not a sit-and-go, and a config that
+contradicts itself should never reach the engine. The toggle is hidden rather
+than disabled in that mode, with one line saying what happens instead.
+
+**The setup screen is a formSheet, reached from the header.** Same precedent as
+the review sheet: a secondary flow over the felt, not a destination. The felt has
+no room for a settings control, and a header accessory costs nothing.
+
+### Traps that cost real time
+
+**Removing a fixed seed breaks every test that named a card.** Four assertions
+like `getByLabelText('Call 10')` were quietly depending on the frozen session.
+That they broke is the point — they were testing one seeded table while claiming
+to test the screen.
+
+**A mixed table of four opponents deals four archetypes, not three.** An
+off-by-one in the test, not the code, and the profile objects in the failure diff
+are long enough to hide it.
+
+### Known gaps
+
+- **The setup does not persist.** Relaunching returns to the default six-handed
+  5/10 table. Settings storage is its own thing — SQLite has no key-value table
+  and AsyncStorage is not installed.
+- **The seat plates still do not say what each bot is.** The setup screen names
+  them — "Ava, The Calling Station" — but once you are at the felt they are back
+  to being names. Putting the type on an 84pt seat plate means widening
+  `ReplaySeat`, which reaches into persistence, so it is its own slice.
+- **No blind levels that rise.** `SessionConfig.handsPerLevel` exists and the
+  screen offers a single level; a real sit-and-go wants a ladder.
+- **The picker options are untestable under Jest.** They are native views and
+  `Picker.Item` renders `null`, so the screen tests cover the summary, the seat
+  list and the button. Which option a tap actually selects is device-only.
+- **No simulator pass**, as ever. Two sheets over the felt, the header
+  accessory, and both colour schemes are unverified.
+- **Nothing warns before ending a session.** The button says it and the sheet
+  says it, but there is no confirmation step.
+
+### Next
+
+Play speed and bot pacing — the other Pillar B requirement still outstanding, and
+the one that makes the felt feel like a game. Then the LLM explanation layer, or
+Phase 4.
 
 ---
 
