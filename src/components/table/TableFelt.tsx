@@ -25,6 +25,26 @@ const GLOW_CENTER_Y = 0.42;
 const GLOW_RADIUS = 0.55;
 
 /**
+ * Ceiling on the corner radius, as a fraction of the long side.
+ *
+ * A capsule takes half the short side, which reads as a table while the felt
+ * is tall — the practice screen — and as a lozenge once it approaches square,
+ * which is what the replay screen's fixed aspect ratio gives it. Capping
+ * against the long side keeps the corners honest at any shape.
+ */
+const MAX_ROUNDNESS = 0.28;
+
+/**
+ * The outer corner radius for a table of this size.
+ *
+ * A capsule (half the short side) while the felt is tall, capped against the
+ * long side as it approaches square so the table never rounds into a lozenge.
+ */
+export function tableRadius(width: number, height: number): number {
+  return Math.min(Math.min(width, height) / 2, Math.max(width, height) * MAX_ROUNDNESS);
+}
+
+/**
  * The table itself: a portrait capsule — dark rim, radial-lit felt and a thin
  * traced inner line. Pure drawing on a Skia canvas; everything interactive
  * sits in sibling views above it.
@@ -38,9 +58,7 @@ export function TableFelt({ width, height }: TableFeltProps) {
     return null;
   }
 
-  // A capsule, not a rounded rectangle: corners take the full half of the
-  // short side, like the reference table.
-  const rimRadius = Math.min(width, height) / 2;
+  const rimRadius = tableRadius(width, height);
   const feltRadius = Math.max(0, rimRadius - RIM_WIDTH);
   const lineRadius = Math.max(0, feltRadius - LINE_INSET);
 
