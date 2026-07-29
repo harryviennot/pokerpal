@@ -1,6 +1,8 @@
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeOut, ReduceMotion, ZoomIn } from 'react-native-reanimated';
 
 import { ChipStack } from '@/components/ui/ChipStack';
+import { springs } from '@/theme';
 
 import { SEAT_HEIGHT, SEAT_WIDTH } from './TableSeat';
 
@@ -9,10 +11,17 @@ export interface TableBetProps {
   amount: number;
 }
 
-/**
- * One seat's live bet on the felt. A thin wrapper today; the chip's travel
- * toward the pot lands here so the seat layout never has to know about it.
- */
+const enter = ZoomIn.springify()
+  .damping(springs.chip.damping)
+  .stiffness(springs.chip.stiffness)
+  .mass(springs.chip.mass)
+  .reduceMotion(ReduceMotion.System);
+
+// The street's bets leave for the middle as the pot collects them; a short
+// fade reads as that without a bespoke flight path.
+const exit = FadeOut.duration(150).reduceMotion(ReduceMotion.System);
+
+/** One seat's live bet on the felt, springing in and fading out to the pot. */
 export function TableBet({ amount }: TableBetProps) {
   if (amount <= 0) {
     return null;
@@ -20,7 +29,9 @@ export function TableBet({ amount }: TableBetProps) {
 
   return (
     <View style={styles.bet} pointerEvents="none">
-      <ChipStack amount={amount} />
+      <Animated.View entering={enter} exiting={exit}>
+        <ChipStack amount={amount} />
+      </Animated.View>
     </View>
   );
 }

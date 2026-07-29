@@ -1,9 +1,12 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text';
 import { type ReplaySeat } from '@/engine';
+import { useMotionPrefs } from '@/hooks/useMotionPrefs';
 import { useTheme, type Theme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/theme';
+import { radius, spacing, springs } from '@/theme';
 import { formatChips } from '@/utils/format';
 
 import { SEAT_WIDTH } from './TableSeat';
@@ -21,13 +24,15 @@ export interface SeatPillProps {
 export function SeatPill({ seat, active }: SeatPillProps) {
   const { colors } = useTheme();
   const won = seat.won > 0;
+  const glow = useWinnerGlow(won);
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.pill,
         { backgroundColor: active ? colors.seatPillActive : colors.seatPill },
         won && [styles.winnerGlow, { borderColor: colors.winner, shadowColor: colors.winnerGlow }],
+        glow,
       ]}>
       <Text
         variant="caption"
@@ -42,8 +47,22 @@ export function SeatPill({ seat, active }: SeatPillProps) {
         style={[styles.stack, { color: stackColor(seat, active, colors) }]}>
         {stackLine(seat)}
       </Text>
-    </View>
+    </Animated.View>
   );
+}
+
+/** Springs the gold shadow in when the seat takes the pot; static without motion. */
+function useWinnerGlow(won: boolean) {
+  const { reduceMotion } = useMotionPrefs();
+  const glow = useSharedValue(0);
+
+  useEffect(() => {
+    const target = won ? 1 : 0;
+
+    glow.value = reduceMotion ? target : withSpring(target, springs.glow);
+  }, [won, reduceMotion, glow]);
+
+  return useAnimatedStyle(() => ({ shadowOpacity: glow.value }));
 }
 
 /** The pill's second line: the chips gained, all in, or the stack behind. */
@@ -78,7 +97,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   winnerGlow: {
-    shadowOpacity: 1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
     elevation: 6,

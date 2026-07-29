@@ -7,6 +7,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
 
+import { DealIn } from './DealIn';
 import { SeatAvatar } from './SeatAvatar';
 import { SeatPill } from './SeatPill';
 
@@ -54,12 +55,14 @@ export function TableSeat({
         {holeCards ? (
           holeCards.map((card, index) => (
             <View key={card} style={cardStyle(revealed, index)}>
-              <PlayingCard
-                size={revealed ? 'large' : 'small'}
-                card={faceUp ? card : undefined}
-                faceDown={!faceUp}
-                dimmed={dims(card)}
-              />
+              <DealIn variant="scale">
+                <PlayingCard
+                  size={revealed ? 'large' : 'small'}
+                  card={faceUp ? card : undefined}
+                  faceDown={!faceUp}
+                  dimmed={dims(card)}
+                />
+              </DealIn>
             </View>
           ))
         ) : (

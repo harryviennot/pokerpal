@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
+import Animated, { ReduceMotion, ZoomIn } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/useTheme';
-import { radius } from '@/theme';
+import { radius, springs } from '@/theme';
 
 export const AVATAR_SIZE = 34;
 
@@ -12,6 +13,12 @@ export interface SeatAvatarProps {
   /** Draws the crown badge on a seat that just won the pot. */
   crowned?: boolean;
 }
+
+const crownIn = ZoomIn.springify()
+  .damping(springs.glow.damping)
+  .stiffness(springs.glow.stiffness)
+  .mass(springs.glow.mass)
+  .reduceMotion(ReduceMotion.System);
 
 /** A player's initial in a circle, with a crown when they take the pot. */
 export function SeatAvatar({ name, crowned = false }: SeatAvatarProps) {
@@ -25,12 +32,11 @@ export function SeatAvatar({ name, crowned = false }: SeatAvatarProps) {
         </Text>
       </View>
       {crowned && (
-        <Text
-          accessibilityLabel="Winner"
-          variant="footnote"
-          style={[styles.crown, { color: colors.winner }]}>
-          ♛
-        </Text>
+        <Animated.View entering={crownIn} style={styles.crown}>
+          <Text accessibilityLabel="Winner" variant="footnote" style={{ color: colors.winner }}>
+            ♛
+          </Text>
+        </Animated.View>
       )}
     </View>
   );

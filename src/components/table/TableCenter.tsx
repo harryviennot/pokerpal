@@ -1,12 +1,21 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { PlayingCard } from '@/components/ui/PlayingCard';
 import { Text } from '@/components/ui/Text';
 import { snapshotPot, type Card, type TableSnapshot } from '@/engine';
+import { useMotionPrefs } from '@/hooks/useMotionPrefs';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/theme';
+import { radius, spacing, springs } from '@/theme';
 import { formatChips } from '@/utils/format';
 
+import { DealIn } from './DealIn';
 import { WinnerBanner } from './WinnerBanner';
 import { winnerSummary } from './winnerSummary';
 
@@ -21,6 +30,7 @@ export function TableCenter({ snapshot, winningFive }: TableCenterProps) {
   const { colors } = useTheme();
   const pot = snapshotPot(snapshot);
   const summary = winnerSummary(snapshot);
+  const tick = usePotTick(pot);
 
   return (
     <View style={styles.middle} pointerEvents="none">
@@ -31,19 +41,22 @@ export function TableCenter({ snapshot, winningFive }: TableCenterProps) {
         <Text variant="caption" style={[styles.potLabel, { color: colors.onFelt }]}>
           Pot total
         </Text>
-        <Text variant="headline" tabular style={{ color: colors.onFelt }}>
-          {formatChips(pot)}
-        </Text>
+        <Animated.View style={tick}>
+          <Text variant="headline" tabular style={{ color: colors.onFelt }}>
+            {formatChips(pot)}
+          </Text>
+        </Animated.View>
       </View>
 
       <View style={styles.board}>
         {snapshot.board.map((card) => (
-          <PlayingCard
-            key={card}
-            card={card}
-            size="medium"
-            dimmed={winningFive.size > 0 && !winningFive.has(card)}
-          />
+          <DealIn key={card}>
+            <PlayingCard
+              card={card}
+              size="medium"
+              dimmed={winningFive.size > 0 && !winningFive.has(card)}
+            />
+          </DealIn>
         ))}
       </View>
 
@@ -56,6 +69,20 @@ export function TableCenter({ snapshot, winningFive }: TableCenterProps) {
       <WinnerBanner summary={summary} />
     </View>
   );
+}
+
+/** A small scale pulse on the pot amount whenever it changes. */
+function usePotTick(pot: number) {
+  const { reduceMotion } = useMotionPrefs();
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (!reduceMotion) {
+      scale.value = withSequence(withSpring(1.06, springs.pulse), withSpring(1, springs.pulse));
+    }
+  }, [pot, reduceMotion, scale]);
+
+  return useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 }
 
 const styles = StyleSheet.create({
