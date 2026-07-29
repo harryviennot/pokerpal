@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 
+import { PokerTable } from '@/components/table/PokerTable';
+import { ReplayCommentary } from '@/components/table/ReplayCommentary';
+import { ReplayControls } from '@/components/table/ReplayControls';
 import { Screen } from '@/components/ui/Screen';
-import { Text } from '@/components/ui/Text';
 import {
   amountToCall,
   costliestDecision,
@@ -11,16 +12,13 @@ import {
   snapshotPot,
   type LegalAction,
 } from '@/engine';
+import { useHandReplay } from '@/hooks/useHandReplay';
 
 import { ActionBar } from './ActionBar';
 import { BetSizer } from './BetSizer';
-import { STREET_LABELS } from './coachCopy';
 import { CoachNote } from './CoachNote';
 import { HandResult } from './HandResult';
-import { PokerTable } from './PokerTable';
-import { ReplayControls } from './ReplayControls';
 import { useHandCoach } from './useHandCoach';
-import { useHandReplay } from './useHandReplay';
 import { usePracticeStore } from './usePracticeStore';
 
 /**
@@ -58,14 +56,7 @@ export function TableScreen() {
     <Screen>
       <PokerTable snapshot={snapshot} heroSeat={heroSeat} />
 
-      <View style={styles.commentary}>
-        <Text variant="footnote" tone="secondaryLabel">
-          {STREET_LABELS[snapshot.street]} · {replay.index + 1} of {replay.frames.length}
-        </Text>
-        <Text variant="body" numberOfLines={2}>
-          {replay.frame.description}
-        </Text>
-      </View>
+      <ReplayCommentary frame={replay.frame} index={replay.index} total={replay.frames.length} />
 
       {hand.complete ? (
         <>
@@ -129,11 +120,3 @@ function useBetSizing(
 
   return [to, (next: number) => setSizing({ decision, to: next })];
 }
-
-const styles = StyleSheet.create({
-  commentary: {
-    // A fixed two-line block: the felt above must not jump as the text changes.
-    minHeight: 62,
-    gap: 2,
-  },
-});

@@ -1,12 +1,11 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { GRADE_LABELS, GRADE_TONES } from '@/components/coach/coachCopy';
 import { Text } from '@/components/ui/Text';
 import { type DecisionReview } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
-
-import { GRADE_LABELS, GRADE_TONES } from './coachCopy';
 
 export interface CoachNoteProps {
   /** The decision worth talking about, or null when there is nothing to say. */

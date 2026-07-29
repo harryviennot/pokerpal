@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
+import { LEAK_FOCUS } from '@/components/coach/coachCopy';
+import { DecisionRow } from '@/components/coach/DecisionRow';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
@@ -8,8 +10,6 @@ import { Text } from '@/components/ui/Text';
 import { bestDecision, costliestDecision, summarizeSession, topLeaks } from '@/engine';
 import { formatChips } from '@/utils/format';
 
-import { LEAK_FOCUS } from './coachCopy';
-import { DecisionRow } from './DecisionRow';
 import { LeakSummary } from './LeakSummary';
 import { usePracticeStore, type HandCoachRecord } from './usePracticeStore';
 
