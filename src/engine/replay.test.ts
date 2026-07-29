@@ -1,6 +1,14 @@
 import { legalActions } from './betting';
+import { type DecisionFacts, type DecisionReview } from './coach';
+import { type SeatIndex } from './events';
 import { applyAction, startHand } from './hand';
-import { replayHand, snapshotPot, snapshotToCall, type ReplayFrame } from './replay';
+import {
+  replayHand,
+  reviewsByFrame,
+  snapshotPot,
+  snapshotToCall,
+  type ReplayFrame,
+} from './replay';
 import { createRng, type Rng } from './rng';
 import { type Action, type HandState, type LegalAction, type TableConfig } from './table';
 
@@ -157,6 +165,76 @@ describe('replayHand', () => {
     expect(frames[0]?.description).toBe('Hand #7 begins, button on Ava');
   });
 });
+
+describe('reviewsByFrame', () => {
+  const frames = replayHand({ seats: SEATS, events: showdownHand().events });
+  const actions = (seat: SeatIndex): readonly ReplayFrame[] =>
+    frames.filter((frame) => frame.event.type === 'actionTaken' && frame.event.seat === seat);
+
+  it('lands each review on the frame of the action it graded', () => {
+    const acted = actions(0);
+    const reviews = acted.map((_, index) => review({ evLoss: index }));
+    const aligned = reviewsByFrame(frames, reviews, 0);
+
+    expect(aligned).toHaveLength(frames.length);
+    for (const [ordinal, frame] of acted.entries()) {
+      expect(aligned[frame.index]).toBe(reviews[ordinal]);
+    }
+  });
+
+  it('leaves every other frame null, including the other seats’ actions', () => {
+    const aligned = reviewsByFrame(
+      frames,
+      actions(0).map(() => review()),
+      0,
+    );
+    const graded = new Set(actions(0).map((frame) => frame.index));
+
+    for (const [index, entry] of aligned.entries()) {
+      expect(entry === null).toBe(!graded.has(index));
+    }
+  });
+
+  it('refuses to guess when the counts disagree', () => {
+    // One decision the coach could not grade is enough: pairing by ordinal from
+    // here would blame the wrong action, so nothing is claimed at all.
+    const short = actions(0)
+      .slice(1)
+      .map(() => review());
+
+    expect(reviewsByFrame(frames, short, 0).every((entry) => entry === null)).toBe(true);
+  });
+
+  it('says nothing about a seat that never acted', () => {
+    expect(reviewsByFrame(frames, [], 1).every((entry) => entry === null)).toBe(true);
+  });
+});
+
+const FACTS: DecisionFacts = {
+  street: 'flop',
+  playersBehind: 1,
+  pot: 60,
+  toCall: 20,
+  stack: 940,
+  spr: 15.7,
+  equity: 0.52,
+  requiredEquity: 0.25,
+  outs: 9,
+};
+
+function review(overrides: Partial<DecisionReview> = {}): DecisionReview {
+  return {
+    seat: 0,
+    action: { type: 'call' },
+    best: { type: 'call' },
+    grade: 'correct',
+    evLoss: 0,
+    reason: 'Called 33% of pot with 52% equity, needing 25%.',
+    leak: null,
+    facts: FACTS,
+    ...overrides,
+  };
+}
 
 /**
  * The property harness: the replay must agree with the engine on every hand the

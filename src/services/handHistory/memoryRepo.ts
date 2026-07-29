@@ -80,10 +80,22 @@ export function createMemoryHandHistoryRepo(): HandHistoryRepo {
         return Promise.resolve<StoredHand | null>(null);
       }
 
+      const session = sessions.get(hand.sessionId);
+
+      // Unreachable — `saveHand` refuses a hand with no session — but the hero's
+      // seat is not something to default. A felt rotated to a guessed seat is
+      // wrong in a way nobody would notice.
+      if (!session) {
+        return Promise.reject(
+          new PersistenceError('read', `Hand ${id} has no session ${hand.sessionId}.`),
+        );
+      }
+
       return Promise.resolve({
         ...summarize(hand),
         seed: hand.seed,
         button: hand.button,
+        heroSeat: session.heroSeat,
         blinds: hand.blinds,
         seats: hand.seats,
         events: hand.events,

@@ -6,6 +6,121 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 3, slice 4: a stored hand opens and replays
+
+Tapping a row in History now deals that hand back onto the felt and steps
+through it action by action, with the coach's verdict appearing on the frame of
+the decision it graded. Pillar B's *"every hand is stored locally and replayable
+street by street"* is now true on both halves.
+
+Delivered as two commits: a pure refactor, then the feature.
+
+| File | What |
+| --- | --- |
+| `src/components/table/` | `PokerTable`, `TableSeat`, `ReplayControls`, moved out of practice, plus a new `ReplayCommentary` |
+| `src/components/coach/` | `DecisionRow`, `coachCopy`, same move |
+| `src/hooks/useHandReplay.ts` | the replay cursor, now shared |
+| `src/fixtures/playedHand.ts` | a real engine-played and coach-graded hand, for any test that needs one |
+| `src/components/ui/{Button,EmptyState}.tsx` | the retry button and the "nothing here" screen, extracted on their second use |
+| `src/engine/replay.ts` | `reviewsByFrame`: verdicts lined up against the frames they belong to |
+| `src/services/handHistory/` | `StoredHand` gained `heroSeat`, read from the hand's own session |
+| `src/features/tracker/` | `useStoredHand`, `HandReplayScreen`, `HandFacts`, a pressable `HandHistoryRow` |
+| `app/history/[id].tsx` | the app's first route parameter |
+
+482 tests passing, up from 464. Typecheck and lint clean. No new dependencies.
+
+### Decisions worth knowing about
+
+**The move came first, and on its own.** The replay screen needs the felt, the
+replay cursor and the coach's decision row, all of which lived inside the
+practice feature — and features may not import each other's internals. Doing it
+as a separate commit with an unchanged test count is what makes the feature diff
+readable.
+
+**`src/components/ui/` is the design system; `src/components/<domain>/` is
+everything else shared.** `ui/` is described in design vocabulary — Button, Text,
+StatRow, a card face — and its value is that it stays scannable, because
+CLAUDE.md tells everyone to check it before writing a component. `PokerTable`
+takes a `TableSnapshot` and `DecisionRow` takes a `DecisionReview`: each renders
+exactly one engine type. That is a different altitude, so `table/` and `coach/`
+sit beside `ui/` rather than inside it. CLAUDE.md was updated, because it is the
+source of truth for this and the convention is new.
+
+**Only what is actually shared moved.** `CoachNote` and `LeakSummary` stayed in
+practice: nothing else consumes them, and `CoachNote`'s accessibility hint names
+the session review. The rule says *shared by two features*, present tense — one
+anticipated caller is not two.
+
+**`heroSeat` is read from the session, not guessed.** The felt rotates to the
+hero and turns their cards face up, so a stored hand cannot be replayed without
+it. `hero_seat` was already on the `sessions` table and simply never read back,
+so `getHand` now joins it — no migration, and the log's earlier claim that a hand
+replays "from its row alone" is finally true. The alternatives all fail on a real
+hand: `reviews[0].seat` does not exist when the hero folded preflop with nothing
+graded, and hardcoding 0 renders a rotated felt silently wrong the day a second
+hero seat exists. The contract test stores two hands under sessions with
+different hero seats, so both wrong answers fail it.
+
+**`reviewsByFrame` refuses to guess.** `reviewHand` drops any decision the coach
+could not grade, so its output is a *subsequence* of the hero's actions, not a
+pairing. If the counts disagree the function returns all nulls rather than
+attaching a verdict to the wrong action. A coach that says nothing is
+recoverable; a coach that blames the wrong decision is the trust failure the PRD
+names as the product's biggest risk.
+
+**The verdict shows in place, not just in a list.** Both, in fact: the frame the
+cursor is on carries its own verdict, and every verdict is listed below. Seeing
+"CORRECT — called 67% of pot with 47% equity" at the exact moment it was decided
+is the thing this screen is for; the list is the at-a-glance version.
+
+**The felt is sized by aspect ratio, not flexed.** `PokerTable` fills its parent,
+and a `flex: 1` child of a `ScrollView` collapses to nothing — the screen would
+render a felt of zero height and no test could see it. `aspectRatio: 0.85` scales
+with the device instead of picking a magic height.
+
+### Traps that cost real time
+
+**`SELECT h.*, s.*` would have silently corrupted the row.** `sessions` also has
+`id`, `seed`, `small_blind` and `big_blind`, and SQLite resolves duplicate result
+column names last-wins — a star join would have overwritten the hand's id and
+blinds with the session's. The query names `s.hero_seat` and nothing else.
+
+**A fixture that always takes the first legal action folds preflop.** The first
+version of `playedHand.ts` produced exactly one hero decision, which is not
+enough to test stepping between verdicts. Checking and calling instead reaches a
+showdown and grades four.
+
+**`HistoryScreen.test.tsx` kept passing after the screen started importing
+`router`.** The mock factory did not define it, so `router` was `undefined` and
+nothing noticed until something pressed a row. Green tests are not proof the mock
+is complete.
+
+### Known gaps
+
+- **The SQL `getHand` join is the one statement Jest cannot run.** expo-sqlite
+  does not exist under it, so the join is verified by the contract suite against
+  `memoryRepo` and by review. Worse: every stored session has `heroSeat` 0 today,
+  so even a device run cannot distinguish the join from the hardcode without
+  temporarily moving `HERO_SEAT`.
+- **No simulator pass**, again — remote Linux container. The felt inside a scroll
+  view, the aspect ratio across device sizes, the title swapping to `Hand #12`
+  after load, the push transition inside the History tab and both colour schemes
+  all need a device.
+- **A hand stored with no events** renders the summary and decisions but no felt.
+  Reachable, handled, and it looks like an omission rather than an explanation.
+- **The replay does not animate or auto-play.** Stepping is manual; the PRD's
+  play-speed controls belong with the pacing slice.
+- **Nothing links a hand back to its session**, so there is no way to see the
+  other hands played alongside it.
+
+### Next
+
+Leak trends over time — the last thing the log's Phase 3 list still owes, and now
+the only one whose data was already there. Or the LLM explanation layer over the
+coach's facts.
+
+---
+
 ## 2026-07-29 — Phase 3, slice 3: hands survive the app — SQLite and the History tab
 
 The first I/O in the repo. Every finished hand is written to expo-sqlite with

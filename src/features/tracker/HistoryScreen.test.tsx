@@ -1,4 +1,5 @@
 import { cleanup, render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import {
   installMemoryHandHistoryRepo,
@@ -15,6 +16,7 @@ jest.mock('expo-router', () => {
   const react = require('react') as { useEffect: (run: () => void, deps: unknown[]) => void };
 
   return {
+    router: { push: jest.fn() },
     useFocusEffect: (callback: () => void) => {
       react.useEffect(callback, [callback]);
     },
@@ -63,6 +65,26 @@ describe('HistoryScreen', () => {
     expect(screen.getByText('Hand #1')).toBeOnTheScreen();
     expect(screen.getByText('+140')).toBeOnTheScreen();
     expect(screen.getByText('-60')).toBeOnTheScreen();
+  });
+
+  it('opens the hand a row is tapped on', async () => {
+    const repo = installMemoryHandHistoryRepo();
+
+    await seedHands(repo);
+
+    const user = userEvent.setup();
+
+    await render(<HistoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Hand #2')).toBeOnTheScreen());
+
+    // Newest first, so the second stored hand is the first row.
+    await user.press(screen.getByLabelText('Hand 2, lost 60 chips'));
+
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/history/[id]',
+      params: { id: '2' },
+    });
   });
 
   it('says so when nothing has been played', async () => {

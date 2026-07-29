@@ -14,6 +14,7 @@
  */
 
 import { type Card } from './cards';
+import { type DecisionReview } from './coach';
 import { type HandRank } from './evaluator';
 import {
   describeEvent,
@@ -87,6 +88,35 @@ export function replayHand({ seats, events }: ReplayInput): readonly ReplayFrame
   }
 
   return frames;
+}
+
+/**
+ * The coach's verdicts lined up against the frames they belong to.
+ *
+ * Returns one entry per frame: the review of that frame's action, or null where
+ * the frame is not a graded decision by `seat`. `reviewHand` drops any decision
+ * the coach could not grade, so the reviews are a *subsequence* of the seat's
+ * actions rather than a guaranteed pairing — when the counts disagree this
+ * returns all nulls rather than attributing a grade to the wrong action. A
+ * coach that says nothing is recoverable; one that blames the wrong decision is
+ * not.
+ */
+export function reviewsByFrame(
+  frames: readonly ReplayFrame[],
+  reviews: readonly DecisionReview[],
+  seat: SeatIndex,
+): readonly (DecisionReview | null)[] {
+  const acted = frames.filter(
+    (frame) => frame.event.type === 'actionTaken' && frame.event.seat === seat,
+  );
+
+  if (acted.length !== reviews.length) {
+    return frames.map(() => null);
+  }
+
+  const byIndex = new Map(acted.map((frame, ordinal) => [frame.index, reviews[ordinal] ?? null]));
+
+  return frames.map((frame) => byIndex.get(frame.index) ?? null);
 }
 
 /** Every chip wagered this hand: the middle plus what is still in front of seats. */
