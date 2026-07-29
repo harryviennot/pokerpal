@@ -54,6 +54,27 @@ describe('useHandHistory', () => {
     });
   });
 
+  it('loads the trend and the leak tallies in the same round', async () => {
+    const repo = installMemoryHandHistoryRepo();
+
+    await seedOneHand(repo);
+
+    const { result } = await renderHook(() => useHandHistory());
+
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+
+    const state = result.current.state;
+
+    expect(state.status === 'ready' && state.sessions).toHaveLength(1);
+    expect(state.status === 'ready' && state.sessions[0]).toMatchObject({
+      hands: 1,
+      net: 140,
+      decisionsGraded: 0,
+      mistakes: 0,
+    });
+    expect(state.status === 'ready' && state.leaks).toEqual([]);
+  });
+
   it('lands in the error state when the repository fails', async () => {
     const repo = installMemoryHandHistoryRepo();
 

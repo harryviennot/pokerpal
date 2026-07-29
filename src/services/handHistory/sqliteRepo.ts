@@ -9,7 +9,7 @@
 
 import * as SQLite from 'expo-sqlite';
 
-import { type Blinds, type DecisionReview, type HandEvent } from '@/engine';
+import { type Blinds, type DecisionReview, type HandEvent, type Leak } from '@/engine';
 
 import { COACH_VERSION, pendingMigrations } from './migrations';
 import {
@@ -28,6 +28,16 @@ interface HandSummaryRow {
   played_at: number;
   hero_net: number;
   decisions_graded: number;
+  ev_lost: number;
+}
+
+interface SessionStatRow {
+  session_id: number;
+  started_at: number;
+  hands: number;
+  net: number;
+  decisions_graded: number;
+  mistakes: number;
   ev_lost: number;
 }
 
@@ -170,6 +180,53 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
           events: JSON.parse(row.events_json) as HandEvent[],
           reviews: reviewRows.map((stored) => JSON.parse(stored.review_json) as DecisionReview),
         };
+      }),
+
+    listSessions: (options) =>
+      guard('read', async () => {
+        // Correlated subqueries rather than one join: joining hands to their
+        // reviews multiplies the hand rows, and SUM(hero_net) over that join
+        // counts a hand once per decision it contains.
+        const rows = await db.getAllAsync<SessionStatRow>(
+          `SELECT s.id AS session_id, s.started_at,
+                  (SELECT COUNT(*) FROM hands h WHERE h.session_id = s.id) AS hands,
+                  (SELECT COALESCE(SUM(h.hero_net), 0) FROM hands h WHERE h.session_id = s.id) AS net,
+                  (SELECT COUNT(*) FROM decision_reviews r
+                     JOIN hands h ON h.id = r.hand_id WHERE h.session_id = s.id) AS decisions_graded,
+                  (SELECT COUNT(*) FROM decision_reviews r
+                     JOIN hands h ON h.id = r.hand_id
+                    WHERE h.session_id = s.id AND r.grade IN ('mistake', 'blunder')) AS mistakes,
+                  (SELECT COALESCE(SUM(r.ev_loss), 0) FROM decision_reviews r
+                     JOIN hands h ON h.id = r.hand_id WHERE h.session_id = s.id) AS ev_lost
+           FROM sessions s
+           WHERE EXISTS (SELECT 1 FROM hands h WHERE h.session_id = s.id)
+           ORDER BY s.started_at DESC, s.id DESC
+           LIMIT ?`,
+          options?.limit ?? -1,
+        );
+
+        return rows.map((row) => ({
+          sessionId: row.session_id,
+          startedAt: row.started_at,
+          hands: row.hands,
+          net: row.net,
+          decisionsGraded: row.decisions_graded,
+          mistakes: row.mistakes,
+          evLost: row.ev_lost,
+        }));
+      }),
+
+    leakTotals: () =>
+      guard('read', async () => {
+        const rows = await db.getAllAsync<{ leak: Leak; count: number; ev_loss: number }>(
+          `SELECT leak, COUNT(*) AS count, COALESCE(SUM(ev_loss), 0) AS ev_loss
+           FROM decision_reviews
+           WHERE leak IS NOT NULL
+           GROUP BY leak
+           ORDER BY ev_loss DESC`,
+        );
+
+        return rows.map((row) => ({ leak: row.leak, count: row.count, evLoss: row.ev_loss }));
       }),
 
     totals: () =>

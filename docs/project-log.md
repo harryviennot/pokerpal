@@ -6,6 +6,113 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 3, slice 5: the leak dashboard and the trend that earns itself
+
+The History tab became the dashboard the PRD asks for: mistakes per hundred
+decisions charted session by session, and the top three leaks tallied across
+every session ever played. Pillar C's *"aggregated into a 'Your top 3 leaks'
+dashboard with trend lines over time"* is the last thing Phase 3 owed.
+
+| File | What |
+| --- | --- |
+| `src/engine/trends.ts` | `summarizeTrend`, `mistakeRate`, `isMistake`, and the bands that decide whether there is a trend at all |
+| `src/services/handHistory/` | `listSessions` and `leakTotals` — two aggregate queries, no schema change |
+| `src/components/ui/Sparkbars.tsx` | a run of values as bars, drawn in plain Views |
+| `src/components/coach/LeakSummary.tsx` | moved down on its second consumer |
+| `src/features/tracker/MistakeTrend.tsx` | the chart, the rate and the sentence about it |
+| `src/features/tracker/{HistoryScreen,useHandHistory}` | the dashboard, loaded in one round of queries |
+
+504 tests passing, up from 482. Typecheck and lint clean. No new dependencies.
+
+### Decisions worth knowing about
+
+**The metric is a rate, never a count.** Leak counts rise because you played
+more, so a raw-count chart tells an improving player they are getting worse. The
+unit is mistakes per hundred graded decisions, which is also the PRD's own
+success metric — *"coach mistake rate per 100 decisions trends downward over
+4 weeks"*. There is a test whose whole job is to assert that a tenfold busier
+run of sessions at the same rate reads as `steady`.
+
+**The engine refuses to name a direction it cannot back.** Under four sessions
+or forty graded decisions, `direction` is `unknown` and the UI says "play four
+sessions and this starts reading as a trend" instead of drawing a verdict. The
+log has recorded twice already that a poker number over a small sample measures
+variance; a trend line is that mistake with a picture attached.
+
+**The band is deliberately wide, and asymmetric on purpose.** A move must clear
+a quarter of the earlier rate *and* two mistakes per hundred before it is called.
+Telling an improving player they are getting worse costs trust the coach does not
+get back; missing a small genuine move costs one more session of "steady".
+
+**Direction is the recent half against the earlier half, not a fitted line.** It
+needs no regression to explain, one wild session cannot swing it, and a player
+can check the claim themselves. A trend the user cannot verify is a trend they
+have to take on faith, which is the opposite of the point.
+
+**Sessions are the x-axis, not calendar days.** A session is a unit a player
+recognises — "last night" — and bucketing by day in SQL would have to pick a
+timezone that `formatWhen` then disagrees with on the device. `sessions.started_at`
+was already there.
+
+**The chart is Views, not a library.** Skia and SVG are both uninstalled, and
+CLAUDE.md's dependency rule says do not add one if what is here will do. Six bars
+need no drawing engine; `ChipStack` already builds its discs the same way. Axes,
+gridlines and a curve would be decoration over six numbers. Each bar carries its
+own accessibility label, because the shape is exactly what a screen reader
+cannot see.
+
+**Two aggregate queries, not one review-fetching endpoint.** `decision_reviews`
+already denormalises `grade`, `leak` and `ev_loss` into real columns — that was
+slice 3 being careful — so both answers are one `GROUP BY` away and no JSON is
+parsed. No migration.
+
+**One hook, one round of queries.** The History tab reads a single local
+database, so `useHandHistory` fetches all four results in one `Promise.all`
+rather than four hooks racing four spinners over one screen.
+
+### Traps that cost real time
+
+**A hands-to-reviews join counts a hand once per decision it contains.** The
+first `listSessions` summed `hero_net` over the joined rows, so a hand with three
+graded decisions contributed its net three times. Correlated subqueries per
+column, and a contract test that stores two hands and two reviews specifically so
+the wrong version fails on the net.
+
+**The first "noise" test was not noise.** 20 to 25 mistakes per hundred is a 25%
+move and the code was right to call it. The lesson is that a band has to be
+chosen from what a false alarm costs, and the test written afterwards — not the
+other way round.
+
+### Known gaps
+
+- **The two new SQL statements are the ones Jest cannot run.** Same standing gap:
+  expo-sqlite is out of Jest's module graph, so the contract suite pins the
+  semantics against `memoryRepo` and the SQL itself is only exercised in the app.
+  These two are the most intricate SQL in the repo, which makes a device pass
+  worth more than usual.
+- **No simulator pass**, again: the bar chart's proportions, the History tab with
+  four sections, and both colour schemes are unverified.
+- **The trend has one bar per session, capped at twelve.** A player with fifty
+  short sessions sees the last twelve; there is no weekly rollup and no way to
+  change the window.
+- **Bars are coloured against the all-time average**, which means a player who is
+  uniformly bad sees half their bars green. It reads as "better than your usual",
+  which is what was wanted, but it is not a standard anyone external would set.
+- **`evLost` is stored and summed but never charted.** Chips given up is arguably
+  the better trend line than mistake count; it is also noisier, and one chart
+  that is understood beats two that are skimmed.
+- **Nothing recommends a drill from a leak yet** — the PRD's closing of the loop
+  between Pillar C and Pillar D.
+
+### Next
+
+Phase 3's remaining piece is the LLM explanation layer over the coach's facts —
+the one part of the pillar that needs the network, an API key, and a rule that it
+may never invent a number. Otherwise Phase 4 opens: the Learn pillar, whose
+preflop trainer the leak tracker is now able to point at.
+
+---
+
 ## 2026-07-29 — Phase 3, slice 4: a stored hand opens and replays
 
 Tapping a row in History now deals that hand back onto the felt and steps

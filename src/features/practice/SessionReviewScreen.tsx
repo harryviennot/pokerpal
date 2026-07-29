@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import { LEAK_FOCUS } from '@/components/coach/coachCopy';
 import { DecisionRow } from '@/components/coach/DecisionRow';
+import { LeakSummary } from '@/components/coach/LeakSummary';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
@@ -10,15 +11,14 @@ import { Text } from '@/components/ui/Text';
 import { bestDecision, costliestDecision, summarizeSession, topLeaks } from '@/engine';
 import { formatChips } from '@/utils/format';
 
-import { LeakSummary } from './LeakSummary';
 import { usePracticeStore, type HandCoachRecord } from './usePracticeStore';
 
 /**
  * Pillar C's review surface: how the session is going, the habits it is
  * showing, and every graded decision from the last finished hand.
  *
- * Session-scoped on purpose — nothing persists yet, so nothing here claims a
- * trend it cannot back. Cross-session tracking arrives with local storage.
+ * Session-scoped on purpose: this is how tonight is going. What happened across
+ * every session lives on the History tab, which reads the stored hands.
  */
 export function SessionReviewScreen() {
   const hand = usePracticeStore((state) => state.hand);

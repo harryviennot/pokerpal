@@ -10,6 +10,7 @@ import {
   type Blinds,
   type DecisionReview,
   type HandEvent,
+  type LeakTally,
   type SeatIndex,
   type TableStyle,
 } from '@/engine';
@@ -75,6 +76,24 @@ export interface HandHistoryTotals {
   decisionsGraded: number;
 }
 
+/**
+ * One session's play, counted rather than fetched.
+ *
+ * The session is the trend's x-axis on purpose: it is a unit the player
+ * recognises ("last night"), and bucketing by calendar day would have to pick a
+ * timezone in SQL that the labels are then formatted in on the device.
+ */
+export interface StoredSessionStat {
+  sessionId: SessionId;
+  startedAt: number;
+  hands: number;
+  net: number;
+  decisionsGraded: number;
+  /** Decisions graded `mistake` or `blunder`. */
+  mistakes: number;
+  evLost: number;
+}
+
 export type PersistenceOp = 'open' | 'migrate' | 'read' | 'write';
 
 /** Every storage failure crosses this boundary as one typed error. */
@@ -97,4 +116,8 @@ export interface HandHistoryRepo {
   listHands(options?: { limit?: number }): Promise<readonly StoredHandSummary[]>;
   getHand(id: number): Promise<StoredHand | null>;
   totals(): Promise<HandHistoryTotals>;
+  /** Newest first. Sessions that never stored a hand are left out. */
+  listSessions(options?: { limit?: number }): Promise<readonly StoredSessionStat[]>;
+  /** Every habit the coach has ever charged the player for, costliest first. */
+  leakTotals(): Promise<readonly LeakTally[]>;
 }
