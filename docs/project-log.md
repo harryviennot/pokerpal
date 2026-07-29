@@ -6,6 +6,100 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 3, slice 1: the coach grades a decision
+
+Pillar C opens. Every decision the player makes is graded against the math, with
+a one-line reason built from numbers the engine computed.
+
+| File | What |
+| --- | --- |
+| `src/engine/coach.ts` | `reviewDecision`, `reviewHand`, grades, leaks, EV |
+| `src/features/practice/useHandCoach.ts` | grades a finished hand for the hero |
+| `src/features/practice/CoachNote.tsx` | the verdict on the costliest decision |
+
+412 tests passing, up from 396. Typecheck and lint clean. No new dependencies.
+Checked on the simulator: *"CORRECT — Folded to 67% of pot holding 28% equity,
+needing 40%."*
+
+### Decisions worth knowing about
+
+**The coach adds judgement, not arithmetic.** Every number it needs already
+existed: equity against modelled ranges from slice 5, the price from `potOdds`,
+outs from `draws`, the stack-to-pot ratio from the table. That is the payoff for
+five slices of keeping the engine pure — Pillar C is a grading rubric on top of
+work already done, not a new pile of poker maths.
+
+**The unit is chips of expected value given up, converted to big blinds.** A
+grade has to mean the same thing at 5/10 as at 50/100, and "what did that cost
+you" is the only currency a player can act on. Bands: under 0.25bb correct, 1bb
+marginal, 4bb mistake, worse is a blunder. The bottom band is deliberately not
+zero — equity is sampled and ranges are estimated, so calling a decision wrong
+over a tenth of a blind of modelled EV is false precision dressed as coaching.
+
+**`reviewHand` re-deals from the deck in the hand's own opening event** and
+replays the actions through the real engine, so the state handed to each grade is
+exactly the one the player faced. This is what `dealHand` was made public for in
+slice 1 of Phase 2, and it means a review can never drift from what happened.
+
+**The coach never speaks mid-hand.** A grade shown while the hand is live would
+leak the ranges it modelled and tell the player what the table is holding. The
+PRD's per-decision "training wheels" mode is a deliberate setting and needs its
+own thinking about what it may reveal; the default is per-hand.
+
+### The bug that mattered
+
+**Folding aces preflop graded as "marginal".** The EV model is showdown-only —
+it asks what each line is worth if the hand were checked down from here — and by
+that measure folding aces on the button costs 0.8bb, because the model assumes no
+further betting ever happens. It is internally consistent and it is obviously
+wrong as coaching.
+
+The fix is deliberately narrow. Severity, and **only** severity, is weighted by
+how much betting is left in the hand (preflop ×4 down to river ×1). The *ranking*
+of the lines stays showdown-only, because scaling the EV of calling would bias
+every grade towards calling more — and a coach that encourages loose calls is
+worse than one that under-rates aces. The weights are coarse, they are named
+`STREET_WEIGHT`, and they are the first thing to replace when a real multi-street
+EV model exists.
+
+The test now asserts the claim that survives those constants changing — folding
+aces is at least a mistake — rather than the exact grade.
+
+### Traps that cost real time
+
+**A stacked-deck test can quietly grade the wrong hand.** Hole cards go
+round-robin from the seat left of the button, so a flat list of six cards does
+not deal the hand it looks like it deals: the first version gave the hero pocket
+sevens while the test name said aces, and the equity assertion was the only thing
+that noticed. The helper now takes named hands and builds the deck in deal order,
+burn cards included.
+
+**`tsc` catches what `babel-jest` does not.** A bad cast in the test helper ran
+happily under Jest and failed the typecheck — worth remembering that a green test
+run is not a green build.
+
+### Known gaps
+
+- **No reference test set.** The PRD wants agreement with a solver-informed
+  rubric on 100 curated decisions; that set does not exist, so the grades are
+  reasoned rather than validated. This is the biggest outstanding item in the
+  pillar.
+- **No LLM layer.** The reason strings are terse and factual by design; turning
+  them into coaching prose is the next slice, and it may never invent a number.
+- **No leak tracker.** Decisions are tagged with the PRD's five categories, but
+  nothing aggregates them into "your top 3 leaks" yet.
+- **Only the costliest decision is shown.** A per-hand list and a session summary
+  both need somewhere to live that is not the felt.
+- **Bet and raise EV has no fold equity**, so the coach under-values aggression:
+  a good bluff reads as marginal rather than correct. Deliberate — it errs
+  towards not encouraging bluffs it cannot price.
+
+### Next
+
+The leak tracker and a hand-review surface, then the LLM layer over the top.
+
+---
+
 ## 2026-07-29 — Phase 2, slice 5: range modelling and the Shark
 
 The bots stop treating every opponent as a random hand. The Shark narrows each
