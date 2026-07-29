@@ -90,10 +90,10 @@ function Preset({ label, onPress }: PresetProps) {
       hitSlop={6}
       style={({ pressed }) => [
         styles.preset,
-        { backgroundColor: colors.secondaryBackground },
+        { backgroundColor: colors.seatPill },
         pressed && styles.pressed,
       ]}>
-      <Text variant="footnote" tone="tint">
+      <Text variant="footnote" style={{ color: colors.onSeatPill }}>
         {label}
       </Text>
     </Pressable>

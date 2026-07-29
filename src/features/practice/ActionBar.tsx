@@ -30,21 +30,20 @@ export function ActionBar({ legal, betTo, onAct }: ActionBarProps) {
 
   return (
     <View style={styles.row}>
-      {fold && <ActionButton label="Fold" tone="danger" onPress={() => onAct({ type: 'fold' })} />}
-      {check && (
-        <ActionButton label="Check" tone="neutral" onPress={() => onAct({ type: 'check' })} />
-      )}
+      {fold && <ActionButton verb="Fold" onPress={() => onAct({ type: 'fold' })} />}
+      {check && <ActionButton verb="Check" onPress={() => onAct({ type: 'check' })} />}
       {call && (
         <ActionButton
-          label={`Call ${formatChips(call.amount)}`}
-          tone="neutral"
+          verb="Call"
+          amount={formatChips(call.amount)}
           onPress={() => onAct({ type: 'call' })}
         />
       )}
       {raise && (
         <ActionButton
-          label={`${raise.type === 'bet' ? 'Bet' : 'Raise to'} ${formatChips(betTo)}`}
-          tone="primary"
+          verb={raise.type === 'bet' ? 'Bet' : 'Raise to'}
+          amount={formatChips(betTo)}
+          primary
           onPress={() => onAct({ type: raise.type, to: betTo })}
         />
       )}
@@ -52,28 +51,20 @@ export function ActionBar({ legal, betTo, onAct }: ActionBarProps) {
   );
 }
 
-type Tone = 'primary' | 'neutral' | 'danger';
-
 interface ActionButtonProps {
-  label: string;
-  tone: Tone;
+  /** The action word, bold on its own line. */
+  verb: string;
+  /** The chips under the verb. Also part of the accessible label. */
+  amount?: string;
+  /** The aggressive action gets the accent color. */
+  primary?: boolean;
   onPress: () => void;
 }
 
-function ActionButton({ label, tone, onPress }: ActionButtonProps) {
+function ActionButton({ verb, amount, primary = false, onPress }: ActionButtonProps) {
   const { colors } = useTheme();
-
-  const background = {
-    primary: colors.tint,
-    neutral: colors.secondaryBackground,
-    danger: colors.secondaryBackground,
-  }[tone];
-
-  const foreground = {
-    primary: colors.cardFace,
-    neutral: colors.label,
-    danger: colors.danger,
-  }[tone];
+  const background = primary ? colors.tint : colors.seatPill;
+  const foreground = primary ? colors.cardFace : colors.onSeatPill;
 
   const press = (): void => {
     // Committing chips is a decision, not a browse: medium weight, per the HIG.
@@ -84,7 +75,7 @@ function ActionButton({ label, tone, onPress }: ActionButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={amount === undefined ? verb : `${verb} ${amount}`}
       onPress={press}
       style={({ pressed }) => [
         styles.button,
@@ -92,8 +83,17 @@ function ActionButton({ label, tone, onPress }: ActionButtonProps) {
         pressed && styles.pressed,
       ]}>
       <Text variant="headline" numberOfLines={1} style={{ color: foreground }}>
-        {label}
+        {verb}
       </Text>
+      {amount !== undefined && (
+        <Text
+          variant="footnote"
+          tabular
+          numberOfLines={1}
+          style={[styles.amount, { color: foreground }]}>
+          {amount}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -105,11 +105,15 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    minHeight: MIN_TOUCH_TARGET,
+    minHeight: MIN_TOUCH_TARGET + spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
+  },
+  amount: {
+    opacity: 0.8,
   },
   pressed: {
     opacity: 0.6,
