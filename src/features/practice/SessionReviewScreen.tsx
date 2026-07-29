@@ -26,6 +26,7 @@ export function SessionReviewScreen() {
   const heroSeat = usePracticeStore((state) => state.heroSeat);
   const reviews = usePracticeStore((state) => state.reviews);
   const coachHistory = usePracticeStore((state) => state.coachHistory);
+  const saveState = usePracticeStore((state) => state.saveState);
 
   // The current hand joins the books the moment it finishes; a live one stays
   // out, because its grades do not exist until it is over.
@@ -116,6 +117,12 @@ export function SessionReviewScreen() {
             </Text>
           )}
         </Section>
+      )}
+
+      {saveState === 'error' && (
+        <Text variant="footnote" tone="danger">
+          {"Couldn't save this session's hands — they won't appear in History."}
+        </Text>
       )}
     </Screen>
   );

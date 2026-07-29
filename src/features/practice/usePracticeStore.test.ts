@@ -1,4 +1,10 @@
 import { legalActions, totalPot } from '@/engine';
+import {
+  installMemoryHandHistoryRepo,
+  PersistenceError,
+  setHandHistoryRepo,
+  type HandHistoryRepo,
+} from '@/services/handHistory';
 
 import { HERO_SEAT, usePracticeStore } from './usePracticeStore';
 
@@ -153,6 +159,48 @@ describe('usePracticeStore', () => {
 
     expect(read().reviews).toEqual([]);
     expect(read().coachHistory).toEqual([]);
+  });
+
+  it('archives the finished hand, grades and all', async () => {
+    const repo = installMemoryHandHistoryRepo();
+
+    read().reset();
+    read().act({ type: 'fold' });
+    read().nextHand();
+    await read().archiver.idle();
+
+    const listed = await repo.listHands();
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.handNumber).toBe(1);
+    expect(listed[0]?.decisionsGraded).toBe(read().coachHistory[0]?.reviews.length);
+
+    const stored = await repo.getHand(listed[0]?.id ?? -1);
+
+    expect(stored?.reviews).toEqual(read().coachHistory[0]?.reviews);
+    expect(stored?.heroNet).toBe(read().coachHistory[0]?.net);
+  });
+
+  it('says so when a save cannot reach the disk, and keeps playing', async () => {
+    const repo = installMemoryHandHistoryRepo();
+    const broken: HandHistoryRepo = {
+      ...repo,
+      saveHand: () => Promise.reject(new PersistenceError('write', 'Disk on fire.')),
+    };
+
+    // The archiver resolves the repository at write time, so this takes effect
+    // even though the store already exists.
+    setHandHistoryRepo(broken);
+    read().reset();
+    read().act({ type: 'fold' });
+    await read().archiver.idle();
+
+    expect(read().saveState).toBe('error');
+    expect(read().hand.complete).toBe(true);
+
+    read().nextHand();
+
+    expect(read().hand.complete).toBe(false);
   });
 
   it('replays identically from the same seed', () => {

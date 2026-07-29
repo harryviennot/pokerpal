@@ -26,6 +26,7 @@ import {
   type SessionConfig,
   type SessionState,
 } from '@/engine';
+import { getHandHistoryRepo, HandArchiver, type ArchivedHand } from '@/services/handHistory';
 
 /** The seat the player occupies. The table rotates so it is at the bottom. */
 export const HERO_SEAT: SeatIndex = 0;
@@ -93,6 +94,10 @@ export interface PracticeState {
   reviews: readonly DecisionReview[];
   /** Every earlier hand's grades, oldest first. */
   coachHistory: readonly HandCoachRecord[];
+  /** Writes finished hands to local storage. One archiver, one stored session. */
+  archiver: HandArchiver;
+  /** Whether the last save reached the disk; the review sheet says so if not. */
+  saveState: 'ok' | 'error';
   /** What the other five seats do — a spread of the named archetypes. */
   opponents: BotPolicy;
   /** Drawn from once per bot decision, so a session is reproducible from its seed. */
@@ -105,72 +110,145 @@ export interface PracticeState {
   reset: (config?: SessionConfig) => void;
 }
 
-export const usePracticeStore = create<PracticeState>((set, get) => ({
-  ...deal(DEFAULT_CONFIG),
+export const usePracticeStore = create<PracticeState>((set, get) => {
+  const dealFresh = (config: SessionConfig) =>
+    deal(
+      config,
+      makeArchiver(config, (status) => set({ saveState: status })),
+    );
 
-  act: (action) => {
-    const { hand, handSeats, heroSeat, opponents, botRng } = get();
+  return {
+    ...dealFresh(DEFAULT_CONFIG),
 
-    // A tap that arrives against a stale table is ignored rather than thrown:
-    // `applyAction` is right to reject it, and the felt is wrong to crash on it.
-    if (hand.complete || hand.toAct !== heroSeat || !isLegalAction(hand, action)) {
-      return;
-    }
+    act: (action) => {
+      const { hand, handSeats, heroSeat, opponents, botRng, archiver } = get();
 
-    const played = playUntilSeat(applyAction(hand, action), heroSeat, opponents, botRng);
+      // A tap that arrives against a stale table is ignored rather than thrown:
+      // `applyAction` is right to reject it, and the felt is wrong to crash on it.
+      if (hand.complete || hand.toAct !== heroSeat || !isLegalAction(hand, action)) {
+        return;
+      }
 
-    set({ hand: played, reviews: gradeHero(played, handSeats, heroSeat) });
-  },
+      const played = playUntilSeat(applyAction(hand, action), heroSeat, opponents, botRng);
+      const reviews = gradeHero(played, handSeats, heroSeat);
 
-  nextHand: () => {
-    const { session, hand, handSeats, heroSeat, opponents, botRng, reviews, coachHistory } = get();
+      // Archived the moment it finishes: the player who reads the result and
+      // kills the app must not lose the hand they just played.
+      if (played.complete) {
+        archiver.recordHand(toArchived(played, handSeats, heroSeat, reviews));
+      }
 
-    if (!hand.complete) {
-      return;
-    }
+      set({ hand: played, reviews });
+    },
 
-    const record: HandCoachRecord = {
-      handNumber: hand.handNumber,
-      net: (hand.players[heroSeat]?.stack ?? 0) - (handSeats[heroSeat]?.stack ?? 0),
-      reviews,
-    };
-    const booked = finishHand(session, hand);
-    const { session: next, hand: dealt } = startNextHand(booked);
-    const played = playUntilSeat(dealt, heroSeat, opponents, botRng);
-    // From `next`, not `booked`: dealing is what tops a busted seat back up.
-    const nextSeats = seatsOf(next);
+    nextHand: () => {
+      const { session, hand, handSeats, heroSeat, opponents, botRng, reviews, coachHistory } =
+        get();
+      const { archiver } = get();
 
-    set({
-      session: next,
-      hand: played,
-      handSeats: nextSeats,
+      if (!hand.complete) {
+        return;
+      }
+
+      const outgoing = toArchived(hand, handSeats, heroSeat, reviews);
+
+      // Defensive re-save; the repository treats a seen hand number as a no-op.
+      archiver.recordHand(outgoing);
+
+      const record: HandCoachRecord = {
+        handNumber: outgoing.handNumber,
+        net: outgoing.heroNet,
+        reviews,
+      };
+      const booked = finishHand(session, hand);
+      const { session: next, hand: dealt } = startNextHand(booked);
+      const played = playUntilSeat(dealt, heroSeat, opponents, botRng);
+      // From `next`, not `booked`: dealing is what tops a busted seat back up.
+      const nextSeats = seatsOf(next);
       // The rare hand that finishes without the hero acting — all in from the
-      // blind, say — still deserves its grades.
-      reviews: gradeHero(played, nextSeats, heroSeat),
-      coachHistory: [...coachHistory, record],
-    });
-  },
+      // blind, say — still deserves its grades and its row.
+      const nextReviews = gradeHero(played, nextSeats, heroSeat);
 
-  reset: (config = DEFAULT_CONFIG) => set(deal(config)),
-}));
+      if (played.complete) {
+        archiver.recordHand(toArchived(played, nextSeats, heroSeat, nextReviews));
+      }
+
+      set({
+        session: next,
+        hand: played,
+        handSeats: nextSeats,
+        reviews: nextReviews,
+        coachHistory: [...coachHistory, record],
+      });
+    },
+
+    reset: (config = DEFAULT_CONFIG) => set(dealFresh(config)),
+  };
+});
 
 /** Everything a fresh table needs: a session, its first hand, and the bots' turn. */
-function deal(config: SessionConfig): Omit<PracticeState, 'act' | 'nextHand' | 'reset'> {
+function deal(
+  config: SessionConfig,
+  archiver: HandArchiver,
+): Omit<PracticeState, 'act' | 'nextHand' | 'reset'> {
   const opened = startSession(config);
   const { session, hand } = startNextHand(opened);
   const botRng = createRng(config.seed ^ BOT_SEED_OFFSET);
   const played = playUntilSeat(hand, HERO_SEAT, OPPONENTS, botRng);
   const handSeats = seatsOf(session);
+  const reviews = gradeHero(played, handSeats, HERO_SEAT);
+
+  if (played.complete) {
+    archiver.recordHand(toArchived(played, handSeats, HERO_SEAT, reviews));
+  }
 
   return {
     session,
     hand: played,
     handSeats,
     heroSeat: HERO_SEAT,
-    reviews: gradeHero(played, handSeats, HERO_SEAT),
+    reviews,
     coachHistory: [],
+    archiver,
+    saveState: 'ok',
     opponents: OPPONENTS,
     botRng,
+  };
+}
+
+/** One archiver per session: its lazily created row is the session's identity. */
+function makeArchiver(
+  config: SessionConfig,
+  onStatus: (status: 'ok' | 'error') => void,
+): HandArchiver {
+  return new HandArchiver(
+    getHandHistoryRepo,
+    {
+      style: config.style,
+      seed: config.seed,
+      heroSeat: HERO_SEAT,
+      blinds: config.levels[0] ?? { smallBlind: 0, bigBlind: 0 },
+    },
+    onStatus,
+  );
+}
+
+/** Everything the repository needs to keep a finished hand, replayably. */
+function toArchived(
+  hand: HandState,
+  seats: readonly { id: string; stack: number }[],
+  heroSeat: SeatIndex,
+  reviews: readonly DecisionReview[],
+): ArchivedHand {
+  return {
+    handNumber: hand.handNumber,
+    seed: hand.seed,
+    button: hand.button,
+    blinds: hand.blinds,
+    seats,
+    events: hand.events,
+    heroNet: (hand.players[heroSeat]?.stack ?? 0) - (seats[heroSeat]?.stack ?? 0),
+    reviews,
   };
 }
 

@@ -17,6 +17,10 @@ export default function RootLayout() {
           <NativeTabs.Trigger.Icon sf="suit.spade.fill" />
           <NativeTabs.Trigger.Label>Table</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="history">
+          <NativeTabs.Trigger.Icon sf="clock" />
+          <NativeTabs.Trigger.Label>History</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
       </NativeTabs>
       <StatusBar style="auto" />
     </ThemeProvider>
