@@ -33,7 +33,14 @@ export type HandEvent =
   | { type: 'actionTaken'; seat: SeatIndex; action: LoggedAction; allIn: boolean }
   /** The excess of an unmatched bet, handed back before the pot is built. */
   | { type: 'uncalledBetReturned'; seat: SeatIndex; amount: number }
-  | { type: 'showdownHand'; seat: SeatIndex; cards: readonly [Card, Card]; rank: HandRank }
+  /** `bestFive` is optional: hands archived before it existed replay without it. */
+  | {
+      type: 'showdownHand';
+      seat: SeatIndex;
+      cards: readonly [Card, Card];
+      rank: HandRank;
+      bestFive?: readonly Card[];
+    }
   /** A losing hand that was never shown; recorded so replay can grey the seat out. */
   | { type: 'handMucked'; seat: SeatIndex }
   | { type: 'potAwarded'; seat: SeatIndex; amount: number; potIndex: number; oddChip: boolean }

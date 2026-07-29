@@ -330,3 +330,40 @@ function chooseAction(legal: readonly LegalAction[], rng: Rng): Action {
 
   return pick.type === 'bet' ? { type: 'bet', to } : { type: 'raise', to };
 }
+
+describe('best five in the snapshot', () => {
+  it('fills bestFive when a hand is shown and leaves it null before', () => {
+    const hand = showdownHand();
+    const frames = replayHand({ seats: SEATS, events: hand.events });
+    const last = frames[frames.length - 1]?.snapshot;
+    const beforeShowdown = frameFor(
+      frames,
+      (frame) => frame.event.type === 'streetDealt' && frame.event.street === 'river',
+    ).snapshot;
+
+    expect(beforeShowdown.seats.every((seat) => seat.bestFive === null)).toBe(true);
+
+    const shown = last?.seats.filter((seat) => seat.shown) ?? [];
+
+    expect(shown.length).toBeGreaterThanOrEqual(1);
+
+    for (const seat of shown) {
+      expect(seat.bestFive).toHaveLength(5);
+    }
+  });
+
+  it('replays a log recorded without bestFive as null', () => {
+    const hand = showdownHand();
+    // An archived hand from before the field existed.
+    const legacy = hand.events.map((event) =>
+      event.type === 'showdownHand'
+        ? { type: event.type, seat: event.seat, cards: event.cards, rank: event.rank }
+        : event,
+    );
+    const frames = replayHand({ seats: SEATS, events: legacy });
+    const last = frames[frames.length - 1]?.snapshot;
+
+    expect(last?.seats.some((seat) => seat.shown)).toBe(true);
+    expect(last?.seats.every((seat) => seat.bestFive === null)).toBe(true);
+  });
+});

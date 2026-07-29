@@ -31,6 +31,7 @@ export {
 export { createDeck, drawInto, hasDuplicates, remainingDeck, shuffle } from './deck';
 
 export {
+  bestFive,
   categoryName,
   categoryOf,
   compareHands,
@@ -39,6 +40,8 @@ export {
   HandCategory,
   type HandRank,
 } from './evaluator';
+
+export { describeHandRank, describeMadeHand } from './describeRank';
 
 export { detectDraws, drawLabel, outsToEquity, type DrawInfo, type DrawType } from './draws';
 

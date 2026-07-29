@@ -269,6 +269,55 @@ export function compareHands(a: readonly Card[], b: readonly Card[]): number {
   return handValue(a) - handValue(b);
 }
 
+/**
+ * The five cards that make the best hand out of five to seven, so a showdown
+ * can highlight exactly the cards that play. Display path — this allocates;
+ * simulation loops should stay on `handValue`.
+ *
+ * Deterministic: among tied combinations, the one using the earliest input
+ * cards wins.
+ *
+ * @throws {RangeError} outside five to seven cards.
+ */
+export function bestFive(cards: readonly Card[]): readonly Card[] {
+  if (cards.length < 5 || cards.length > 7) {
+    throw new RangeError(`bestFive needs five to seven cards, got ${cards.length}.`);
+  }
+
+  if (cards.length === 5) {
+    return [...cards];
+  }
+
+  let best: readonly Card[] = [];
+  let bestValue = -1;
+  const pick: Card[] = [];
+
+  // At most seven cards, so brute force over the 2^n masks is 128 iterations
+  // and only the 21 or 6 five-card ones evaluate.
+  for (let mask = 0; mask < 1 << cards.length; mask++) {
+    if (popcount13(mask) !== 5) {
+      continue;
+    }
+
+    pick.length = 0;
+
+    for (let i = 0; i < cards.length; i++) {
+      if ((mask & (1 << i)) !== 0) {
+        pick.push(cards[i] as Card);
+      }
+    }
+
+    const value = handValue(pick);
+
+    if (value > bestValue) {
+      bestValue = value;
+      best = [...pick];
+    }
+  }
+
+  return best;
+}
+
 const CATEGORY_NAMES: Record<HandCategory, string> = {
   [HandCategory.HighCard]: 'High card',
   [HandCategory.Pair]: 'Pair',

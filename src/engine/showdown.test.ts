@@ -155,3 +155,20 @@ describe('reveal order and mucking', () => {
     expect(entries.map((entry) => entry.mucked)).toEqual([false, false]);
   });
 });
+
+describe('best five threading', () => {
+  it('carries the five cards each shown hand plays', () => {
+    const board = parseCards('9h 4s 4d Ac Kd');
+    const players = [seat(0, '9c 9d'), seat(1, 'As Qh')];
+
+    const { entries } = resolveShowdown(players, [pot(600, [0, 1])], board, 0, 0);
+    const winner = entries.find((entry) => entry.seat === 0);
+
+    // Nines full of fours: both hole nines, the board nine and both fours.
+    // The ace and king kickers on the board do not play.
+    expect(winner && [...winner.bestFive].sort((a, b) => a - b)).toEqual(
+      parseCards('9c 9d 9h 4s 4d').sort((a, b) => a - b),
+    );
+    expect(entries.every((entry) => entry.bestFive.length === 5)).toBe(true);
+  });
+});

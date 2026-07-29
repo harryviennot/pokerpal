@@ -12,7 +12,7 @@
  */
 
 import { type Card } from './cards';
-import { evaluateHand, type HandRank } from './evaluator';
+import { bestFive, evaluateHand, type HandRank } from './evaluator';
 import { awardPot, type Award } from './pots';
 import { nextSeat, type Player, type Pot, type SeatIndex } from './table';
 
@@ -20,6 +20,8 @@ export interface ShowdownEntry {
   seat: SeatIndex;
   cards: readonly [Card, Card];
   rank: HandRank;
+  /** The five cards that play, so the table can highlight exactly them. */
+  bestFive: readonly Card[];
   /**
    * True when this hand was beaten by one already shown and never had to be
    * exposed. Its cards stay out of the replay log.
@@ -52,11 +54,14 @@ export function resolveShowdown(
   );
 
   const ranked = new Map<SeatIndex, HandRank>();
+  const fives = new Map<SeatIndex, readonly Card[]>();
 
   for (const player of contesting) {
     const cards = player.holeCards as readonly [Card, Card];
+    const seven = [...cards, ...board];
 
-    ranked.set(player.seat, evaluateHand([...cards, ...board]));
+    ranked.set(player.seat, evaluateHand(seven));
+    fives.set(player.seat, bestFive(seven));
   }
 
   const awards: Award[] = [];
@@ -74,7 +79,7 @@ export function resolveShowdown(
     awards.push(...awardPot(pot, winners, potIndex, button, players.length));
   });
 
-  return { entries: buildEntries(contesting, ranked, players, firstToShow), awards };
+  return { entries: buildEntries(contesting, ranked, fives, players, firstToShow), awards };
 }
 
 function rankValue(ranked: Map<SeatIndex, HandRank>, seat: SeatIndex): number {
@@ -97,6 +102,7 @@ function rankValue(ranked: Map<SeatIndex, HandRank>, seat: SeatIndex): number {
 function buildEntries(
   contesting: readonly Player[],
   ranked: Map<SeatIndex, HandRank>,
+  fives: Map<SeatIndex, readonly Card[]>,
   players: readonly Player[],
   firstToShow: SeatIndex,
 ): ShowdownEntry[] {
@@ -116,6 +122,7 @@ function buildEntries(
       seat: player.seat,
       cards: player.holeCards as readonly [Card, Card],
       rank,
+      bestFive: fives.get(player.seat) as readonly Card[],
       mucked,
     });
   }
