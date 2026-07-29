@@ -10,9 +10,15 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 const setupUser = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
+/** The table these assertions were written against. */
+const SEED = 20260728;
+
 beforeEach(() => {
   jest.useFakeTimers();
-  usePracticeStore.getState().reset();
+  // A fixed seed: these assertions name the cards the table was dealt, and
+  // the store's own default is the clock so a session is never replayed by
+  // accident.
+  usePracticeStore.getState().reset(SEED);
 });
 
 afterEach(async () => {

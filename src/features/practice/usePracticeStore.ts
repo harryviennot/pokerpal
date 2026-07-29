@@ -3,19 +3,15 @@ import { create } from 'zustand';
 import {
   applyAction,
   bySeat,
-  CALLING_STATION,
   createRng,
   finishHand,
   isLegalAction,
   makeBot,
-  MANIAC,
   playUntilSeat,
   reviewHand,
   ROCK,
-  SHARK,
   startNextHand,
   startSession,
-  TAG,
   type Action,
   type BotPolicy,
   type BotProfile,
@@ -28,44 +24,13 @@ import {
 } from '@/engine';
 import { getHandHistoryRepo, HandArchiver, type ArchivedHand } from '@/services/handHistory';
 
+import { DEFAULT_SETUP, seatsFor, toSessionConfig, type TableSetup } from './tableSetup';
+
 /** The seat the player occupies. The table rotates so it is at the bottom. */
 export const HERO_SEAT: SeatIndex = 0;
 
-const STARTING_STACK = 1000;
-
 /** Offsets the bot RNG from the deck's so bots and shuffles never share a stream. */
 const BOT_SEED_OFFSET = 0x9e3779b9;
-
-/**
- * Who sits in each seat, hero first.
- *
- * A spread of personalities rather than five copies of one, so a session shows
- * the player what each type does to them: two solid opponents to lose to, a
- * station to value bet, a maniac to trap, a rock to steal from, and one Shark
- * that reads what the player has been representing. Choosing the mix is the
- * table-configuration slice.
- */
-const TABLE: readonly { id: string; profile: BotProfile | null }[] = [
-  { id: 'You', profile: null },
-  { id: 'Ava', profile: TAG },
-  { id: 'Ben', profile: CALLING_STATION },
-  { id: 'Cleo', profile: ROCK },
-  { id: 'Dev', profile: MANIAC },
-  { id: 'Elle', profile: SHARK },
-];
-
-/**
- * Six-handed, 5/10, rebuys on. A cash game that never ends is the right default
- * for practice: the player leaves when they want to, not when they bust.
- * Configuring any of this is a later slice.
- */
-const DEFAULT_CONFIG: SessionConfig = {
-  seats: TABLE.map((seat) => ({ id: seat.id, stack: STARTING_STACK })),
-  style: 'cash',
-  levels: [{ smallBlind: 5, bigBlind: 10 }],
-  rebuyTo: STARTING_STACK,
-  seed: 20260728,
-};
 
 /**
  * The table's policies, one per seat.
@@ -74,7 +39,21 @@ const DEFAULT_CONFIG: SessionConfig = {
  * `playUntilSeat` stops on the hero, but a hole in the array would be a crash
  * waiting for the first bug that lets the loop past them.
  */
-const OPPONENTS: BotPolicy = bySeat(TABLE.map((seat) => makeBot(seat.profile ?? ROCK)));
+function policiesFor(seats: readonly { profile: BotProfile | null }[]): BotPolicy {
+  return bySeat(seats.map((seat) => makeBot(seat.profile ?? ROCK)));
+}
+
+/**
+ * A seed for a table nobody asked to reproduce.
+ *
+ * The clock, because a fixed one would deal the same session on every launch —
+ * the same cards, the same bots, the same decisions. Every seed is recorded with
+ * its session and its hands, so a table is still replayable after the fact; it
+ * just is not replayed by accident.
+ */
+function freshSeed(): number {
+  return Date.now() >>> 0;
+}
 
 /** One finished hand's coaching, kept so the session can be reviewed. */
 export interface HandCoachRecord {
@@ -85,6 +64,8 @@ export interface HandCoachRecord {
 }
 
 export interface PracticeState {
+  /** The table the player chose. Every field of it is live on the felt. */
+  setup: TableSetup;
   session: SessionState;
   hand: HandState;
   /** Stacks as they were when this hand was dealt, which replay needs. */
@@ -106,19 +87,28 @@ export interface PracticeState {
   act: (action: Action) => void;
   /** Books the finished hand and deals the next one. */
   nextHand: () => void;
-  /** Starts a fresh session from the given config. */
-  reset: (config?: SessionConfig) => void;
+  /** Seats a new table and deals its first hand. The old session is over. */
+  configure: (setup: TableSetup, seed?: number) => void;
+  /** Re-deals the current table. A fresh seed unless one is given. */
+  reset: (seed?: number) => void;
 }
 
 export const usePracticeStore = create<PracticeState>((set, get) => {
-  const dealFresh = (config: SessionConfig) =>
-    deal(
-      config,
-      makeArchiver(config, (status) => set({ saveState: status })),
-    );
+  const dealFresh = (setup: TableSetup, seed: number) => {
+    const config = toSessionConfig(setup, seed);
+
+    return {
+      setup,
+      ...deal(
+        config,
+        policiesFor(seatsFor(setup)),
+        makeArchiver(config, (status) => set({ saveState: status })),
+      ),
+    };
+  };
 
   return {
-    ...dealFresh(DEFAULT_CONFIG),
+    ...dealFresh(DEFAULT_SETUP, freshSeed()),
 
     act: (action) => {
       const { hand, handSeats, heroSeat, opponents, botRng, archiver } = get();
@@ -182,19 +172,22 @@ export const usePracticeStore = create<PracticeState>((set, get) => {
       });
     },
 
-    reset: (config = DEFAULT_CONFIG) => set(dealFresh(config)),
+    configure: (setup, seed = freshSeed()) => set(dealFresh(setup, seed)),
+
+    reset: (seed = freshSeed()) => set(dealFresh(get().setup, seed)),
   };
 });
 
 /** Everything a fresh table needs: a session, its first hand, and the bots' turn. */
 function deal(
   config: SessionConfig,
+  opponents: BotPolicy,
   archiver: HandArchiver,
-): Omit<PracticeState, 'act' | 'nextHand' | 'reset'> {
+): Omit<PracticeState, 'setup' | 'act' | 'nextHand' | 'configure' | 'reset'> {
   const opened = startSession(config);
   const { session, hand } = startNextHand(opened);
   const botRng = createRng(config.seed ^ BOT_SEED_OFFSET);
-  const played = playUntilSeat(hand, HERO_SEAT, OPPONENTS, botRng);
+  const played = playUntilSeat(hand, HERO_SEAT, opponents, botRng);
   const handSeats = seatsOf(session);
   const reviews = gradeHero(played, handSeats, HERO_SEAT);
 
@@ -211,7 +204,7 @@ function deal(
     coachHistory: [],
     archiver,
     saveState: 'ok',
-    opponents: OPPONENTS,
+    opponents,
     botRng,
   };
 }
