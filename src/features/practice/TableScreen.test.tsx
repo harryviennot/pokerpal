@@ -1,9 +1,12 @@
 import { cleanup, render, screen, userEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import { legalActions } from '@/engine';
 
 import { TableScreen } from './TableScreen';
 import { usePracticeStore } from './usePracticeStore';
+
+jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 const setupUser = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
@@ -133,6 +136,16 @@ describe('TableScreen', () => {
     // the equity rather than an opinion.
     expect(screen.getByText(/Folded/)).toBeOnTheScreen();
     expect(screen.getByText(/equity/)).toBeOnTheScreen();
+  });
+
+  it('opens the session review from the coach note', async () => {
+    const user = setupUser();
+
+    await render(<TableScreen />);
+    await user.press(screen.getByLabelText('Fold'));
+    await user.press(screen.getByLabelText(/Folded/));
+
+    expect(router.push).toHaveBeenCalledWith('/table/review');
   });
 
   it('says nothing about a hand still in progress', async () => {

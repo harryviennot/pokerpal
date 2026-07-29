@@ -10,6 +10,7 @@ import {
   makeBot,
   MANIAC,
   playUntilSeat,
+  reviewHand,
   ROCK,
   SHARK,
   startNextHand,
@@ -18,6 +19,7 @@ import {
   type Action,
   type BotPolicy,
   type BotProfile,
+  type DecisionReview,
   type HandState,
   type Rng,
   type SeatIndex,
@@ -73,12 +75,24 @@ const DEFAULT_CONFIG: SessionConfig = {
  */
 const OPPONENTS: BotPolicy = bySeat(TABLE.map((seat) => makeBot(seat.profile ?? ROCK)));
 
+/** One finished hand's coaching, kept so the session can be reviewed. */
+export interface HandCoachRecord {
+  handNumber: number;
+  /** The hero's chips won or lost on the hand. */
+  net: number;
+  reviews: readonly DecisionReview[];
+}
+
 export interface PracticeState {
   session: SessionState;
   hand: HandState;
   /** Stacks as they were when this hand was dealt, which replay needs. */
   handSeats: readonly { id: string; stack: number }[];
   heroSeat: SeatIndex;
+  /** The coach's grades for the current hand. Empty while it is live. */
+  reviews: readonly DecisionReview[];
+  /** Every earlier hand's grades, oldest first. */
+  coachHistory: readonly HandCoachRecord[];
   /** What the other five seats do — a spread of the named archetypes. */
   opponents: BotPolicy;
   /** Drawn from once per bot decision, so a session is reproducible from its seed. */
@@ -95,7 +109,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   ...deal(DEFAULT_CONFIG),
 
   act: (action) => {
-    const { hand, heroSeat, opponents, botRng } = get();
+    const { hand, handSeats, heroSeat, opponents, botRng } = get();
 
     // A tap that arrives against a stale table is ignored rather than thrown:
     // `applyAction` is right to reject it, and the felt is wrong to crash on it.
@@ -103,24 +117,37 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       return;
     }
 
-    set({ hand: playUntilSeat(applyAction(hand, action), heroSeat, opponents, botRng) });
+    const played = playUntilSeat(applyAction(hand, action), heroSeat, opponents, botRng);
+
+    set({ hand: played, reviews: gradeHero(played, handSeats, heroSeat) });
   },
 
   nextHand: () => {
-    const { session, hand, heroSeat, opponents, botRng } = get();
+    const { session, hand, handSeats, heroSeat, opponents, botRng, reviews, coachHistory } = get();
 
     if (!hand.complete) {
       return;
     }
 
+    const record: HandCoachRecord = {
+      handNumber: hand.handNumber,
+      net: (hand.players[heroSeat]?.stack ?? 0) - (handSeats[heroSeat]?.stack ?? 0),
+      reviews,
+    };
     const booked = finishHand(session, hand);
     const { session: next, hand: dealt } = startNextHand(booked);
+    const played = playUntilSeat(dealt, heroSeat, opponents, botRng);
+    // From `next`, not `booked`: dealing is what tops a busted seat back up.
+    const nextSeats = seatsOf(next);
 
     set({
       session: next,
-      hand: playUntilSeat(dealt, heroSeat, opponents, botRng),
-      // From `next`, not `booked`: dealing is what tops a busted seat back up.
-      handSeats: seatsOf(next),
+      hand: played,
+      handSeats: nextSeats,
+      // The rare hand that finishes without the hero acting — all in from the
+      // blind, say — still deserves its grades.
+      reviews: gradeHero(played, nextSeats, heroSeat),
+      coachHistory: [...coachHistory, record],
     });
   },
 
@@ -132,15 +159,53 @@ function deal(config: SessionConfig): Omit<PracticeState, 'act' | 'nextHand' | '
   const opened = startSession(config);
   const { session, hand } = startNextHand(opened);
   const botRng = createRng(config.seed ^ BOT_SEED_OFFSET);
+  const played = playUntilSeat(hand, HERO_SEAT, OPPONENTS, botRng);
+  const handSeats = seatsOf(session);
 
   return {
     session,
-    hand: playUntilSeat(hand, HERO_SEAT, OPPONENTS, botRng),
-    handSeats: seatsOf(session),
+    hand: played,
+    handSeats,
     heroSeat: HERO_SEAT,
+    reviews: gradeHero(played, handSeats, HERO_SEAT),
+    coachHistory: [],
     opponents: OPPONENTS,
     botRng,
   };
+}
+
+/** Samples per graded decision. Review runs once per hand, off the hot path. */
+const COACH_ITERATIONS = 1_500;
+
+/**
+ * Grades the hero's decisions once a hand has finished; nothing while it is
+ * live. A grade shown mid-hand would leak the ranges the coach modelled and
+ * tell the player what the table is holding — the PRD's per-decision
+ * "training wheels" mode is a deliberate setting, not the default.
+ *
+ * The seed is the hand's own, so a review never changes its verdict.
+ */
+function gradeHero(
+  hand: HandState,
+  seats: readonly { id: string; stack: number }[],
+  heroSeat: SeatIndex,
+): readonly DecisionReview[] {
+  if (!hand.complete) {
+    return [];
+  }
+
+  return reviewHand(
+    {
+      seats,
+      button: hand.button,
+      blinds: hand.blinds,
+      handNumber: hand.handNumber,
+      seed: hand.seed,
+    },
+    hand.events,
+    heroSeat,
+    { rng: createRng(hand.seed), iterations: COACH_ITERATIONS },
+  );
 }
 
 /**

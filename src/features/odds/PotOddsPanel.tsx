@@ -1,5 +1,6 @@
 import { StyleSheet, TextInput, View } from 'react-native';
 
+import { StatRow } from '@/components/ui/StatRow';
 import { Text } from '@/components/ui/Text';
 import { analyzePotOdds, type CallVerdict } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
@@ -58,14 +59,14 @@ export function PotOddsPanel({
 
       {(analysis ?? requiredOnly) && (
         <View style={styles.readout}>
-          <Row
+          <StatRow
             label="Equity needed"
             value={formatPercent((analysis ?? requiredOnly)!.requiredEquity)}
           />
           {analysis && (
             <>
-              <Row label="Your equity" value={formatPercent(heroEquity as number)} />
-              <Row
+              <StatRow label="Your equity" value={formatPercent(heroEquity as number)} />
+              <StatRow
                 label="Expected value"
                 value={`${analysis.expectedValue >= 0 ? '+' : ''}${formatChips(analysis.expectedValue)}`}
               />
@@ -91,19 +92,6 @@ function safeAnalyze(pot: number, bet: number, equity: number) {
     // friendlier answer than surfacing a thrown message.
     return null;
   }
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text variant="subheadline" tone="secondaryLabel">
-        {label}
-      </Text>
-      <Text variant="subheadline" tabular>
-        {value}
-      </Text>
-    </View>
-  );
 }
 
 function NumberField({
@@ -165,9 +153,5 @@ const styles = StyleSheet.create({
   },
   readout: {
     gap: spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
 });

@@ -1,27 +1,27 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { amountToCall, legalActions, snapshotPot, type LegalAction, type Street } from '@/engine';
+import {
+  amountToCall,
+  costliestDecision,
+  legalActions,
+  snapshotPot,
+  type LegalAction,
+} from '@/engine';
 
 import { ActionBar } from './ActionBar';
 import { BetSizer } from './BetSizer';
+import { STREET_LABELS } from './coachCopy';
 import { CoachNote } from './CoachNote';
 import { HandResult } from './HandResult';
 import { PokerTable } from './PokerTable';
 import { ReplayControls } from './ReplayControls';
-import { useHandCoach, worstDecision } from './useHandCoach';
+import { useHandCoach } from './useHandCoach';
 import { useHandReplay } from './useHandReplay';
 import { usePracticeStore } from './usePracticeStore';
-
-const STREET_LABELS: Record<Street, string> = {
-  preflop: 'Preflop',
-  flop: 'Flop',
-  turn: 'Turn',
-  river: 'River',
-  showdown: 'Showdown',
-};
 
 /**
  * Pillar B: a hand of NLHE against the table.
@@ -52,7 +52,7 @@ export function TableScreen() {
   const raise = legal.find((action) => action.type === 'bet' || action.type === 'raise');
 
   const [betTo, setBetTo] = useBetSizing(hand.events.length, raise);
-  const reviews = useHandCoach(hand, heroSeat, handSeats);
+  const reviews = useHandCoach();
 
   return (
     <Screen>
@@ -76,7 +76,11 @@ export function TableScreen() {
             onStepStreet={replay.stepStreet}
             onRestart={replay.restart}
           />
-          <CoachNote review={worstDecision(reviews)} total={reviews.length} />
+          <CoachNote
+            review={costliestDecision(reviews)}
+            total={reviews.length}
+            onPress={() => router.push('/table/review')}
+          />
           <HandResult
             net={(hand.players[heroSeat]?.stack ?? 0) - (handSeats[heroSeat]?.stack ?? 0)}
             onNextHand={nextHand}
