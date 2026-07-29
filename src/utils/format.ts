@@ -25,3 +25,13 @@ export function formatChips(chips: number): string {
 export function formatRatio(ratio: number): string {
   return `${ratio.toFixed(1)}x`;
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Formats an epoch-ms timestamp as `Jul 29, 14:32` in the device's timezone. */
+export function formatWhen(timestamp: number): string {
+  const date = new Date(timestamp);
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getHours()}:${minutes}`;
+}

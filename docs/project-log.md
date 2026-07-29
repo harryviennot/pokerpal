@@ -6,6 +6,112 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 3, slice 3: hands survive the app — SQLite and the History tab
+
+The first I/O in the repo. Every finished hand is written to expo-sqlite with
+its full event log, deck and coach grades, and a new History tab lists them
+across restarts. `src/services/` now exists, and the tracker pillar has its
+first surface.
+
+| File | What |
+| --- | --- |
+| `src/services/handHistory/repo.ts` | the contract: `HandHistoryRepo`, `PersistenceError` |
+| `src/services/handHistory/migrations.ts` | schema v1 behind `PRAGMA user_version`, append-only |
+| `src/services/handHistory/sqliteRepo.ts` | the expo-sqlite implementation, the only file importing it |
+| `src/services/handHistory/memoryRepo.ts` | the same contract on arrays, for Jest and previews |
+| `src/services/handHistory/archiver.ts` | the write queue between a synchronous game and an async disk |
+| `src/features/practice/usePracticeStore.ts` | archives on hand completion; `saveState` |
+| `src/features/tracker/` | `useHandHistory`, `HistoryScreen`, `HandHistoryRow` |
+| `app/history/` | the third native tab |
+
+464 tests passing, up from 436. Typecheck and lint clean. One new dependency:
+expo-sqlite, the persistence layer CLAUDE.md names, installed by the slice that
+needs it.
+
+### Decisions worth knowing about
+
+**Events are the stored truth; reviews are stored too, not re-derived.**
+`events_json` carries the deck via the `handStart` event, so a stored hand can
+be replayed or re-graded from its row alone. Grades are also persisted because
+re-deriving them costs ~1 500 Monte Carlo samples per decision — free at the
+moment the hand ends, seconds of CPU if a history list had to do it. A
+`coach_version` column marks which rubric produced each grade, so a future
+coach change can find and re-grade stale verdicts instead of silently mixing
+scales.
+
+**The store never awaits the disk.** `HandArchiver.recordHand` returns void and
+chains every write onto one internal promise tail — the no-floating-promises
+rule is satisfied structurally, writes are strictly ordered, and the session
+row is created lazily by the first hand's write so a hand can never race its
+own session. A failed session insert clears the memo and the next hand retries
+it; failures surface as `saveState: 'error'` and one footnote on the review
+sheet, and the game keeps playing.
+
+**Hands are archived the moment they complete, not when the next one is
+dealt.** The player who reads a result and kills the app keeps that hand.
+`nextHand` re-saves defensively; `UNIQUE(session_id, hand_number)` makes the
+double-save a no-op, which the contract tests pin.
+
+**The contract suite is the spec; the fake is what Jest runs.** expo-sqlite
+does not exist under Jest. Mocking it would test the mock, and better-sqlite3
+would be a native dev-dependency plus an adapter that exists only for tests.
+Instead the repository behavior is one parameterized suite run against
+`memoryRepo`, and `sqliteRepo` promises the same contract — verified in the
+running app, which CLAUDE.md requires before merge anyway. The dynamic import
+in `services/handHistory/index.ts` is what keeps expo-sqlite out of Jest's
+module graph; `jest.setup.ts` installs a fresh memory repo before every test.
+
+**No TanStack Query.** Not installed, and this is local single-writer play
+data — the server-state rules don't apply. One `useHandHistory` hook with
+explicit loading, error and empty states.
+
+**No mid-session resume, on purpose.** `SessionState.rng` is a closure and
+cannot be serialized without engine surgery. The PRD asks for stored,
+replayable hands, not resumable sessions: launch deals fresh, the review sheet
+stays session-scoped, and what survives restart is the History tab.
+
+**`reload` never drops to `loading`.** A tab-focus refresh updates the list in
+place; the spinner exists only before the first result ever arrives.
+
+### Traps that cost real time
+
+**A bare `act(() => hook.reload())` does not flush the async work it starts.**
+The state update fired, the effect re-ran, and the fetch's `setState` then
+landed where no `waitFor` ever saw it — the test read a stale-but-ready state
+forever. `await act(async () => …)` is the form that works; the screen tests
+never hit this because `userEvent.press` already wraps properly.
+
+**Jest cannot run a test file outside the project root** — the babel runtime
+resolves relative to the test file, so a scratch-directory repro fails on
+`@babel/runtime` before it fails on anything real. Debug files go inside
+`src/`, then get deleted.
+
+### Known gaps
+
+- **The SQL implementation is exercised by the app, not by Jest.** The contract
+  suite pins the behavior and `sqliteRepo` mirrors it statement by statement,
+  but nothing automated executes the SQL. A dev-screen run of the contract
+  against the real database on a simulator would close this.
+- **No simulator pass from this environment** (remote Linux container, again):
+  the History tab, the third-tab layout, and an actual kill-and-relaunch
+  persistence check all need a simulator or device before merge.
+- **History lists, but cannot open, a hand.** Tapping a row should replay it —
+  that slice starts by moving `PokerTable`/`useHandReplay`/`DecisionRow` down
+  out of the practice feature, which is its own refactor.
+- **The list is capped at 100 rows** with no paging, and nothing prunes the
+  database, ever.
+- **Trend lines still missing** — but the data side is now done: timestamps,
+  per-hand net, per-decision `ev_loss` and `leak` are all queryable. What
+  remains is a charting decision.
+
+### Next
+
+Either the stored-hand replay screen (move the shared table pieces down, then
+`getHand` feeds the existing replay UI), or leak trends over time now that the
+timestamps exist.
+
+---
+
 ## 2026-07-29 — Phase 3, slice 2: the leak tracker and the session review
 
 The coach's verdicts add up to something. A review sheet off the table shows how

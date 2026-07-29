@@ -1,4 +1,4 @@
-import { formatChips, formatPercent, formatRatio, THIN_SPACE } from './format';
+import { formatChips, formatPercent, formatRatio, formatWhen, THIN_SPACE } from './format';
 
 describe('formatPercent', () => {
   it('renders a probability with one decimal', () => {
@@ -42,5 +42,14 @@ describe('formatRatio', () => {
   it('renders one decimal followed by x', () => {
     expect(formatRatio(2.5)).toBe('2.5x');
     expect(formatRatio(10)).toBe('10.0x');
+  });
+});
+
+describe('formatWhen', () => {
+  it('renders month, day and a zero-padded minute', () => {
+    // Built with the local-time constructor, so the expectation holds in any
+    // timezone the test happens to run in.
+    expect(formatWhen(new Date(2026, 6, 29, 14, 32).getTime())).toBe('Jul 29, 14:32');
+    expect(formatWhen(new Date(2026, 0, 3, 9, 5).getTime())).toBe('Jan 3, 9:05');
   });
 });
