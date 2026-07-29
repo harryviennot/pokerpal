@@ -2,66 +2,80 @@ import { StyleSheet, View } from 'react-native';
 
 import { PlayingCard } from '@/components/ui/PlayingCard';
 import { Text } from '@/components/ui/Text';
-import { type ReplaySeat } from '@/engine';
+import { type Card, type ReplaySeat } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
 
-export const SEAT_WIDTH = 84;
-export const SEAT_HEIGHT = 78;
+import { SeatAvatar } from './SeatAvatar';
+import { SeatPill } from './SeatPill';
+
+export const SEAT_WIDTH = 96;
+export const SEAT_HEIGHT = 96;
 
 export interface TableSeatProps {
   seat: ReplaySeat;
   onButton: boolean;
-  /** The seat this frame's event belongs to. Draws the ring. */
+  /** The seat this frame's event belongs to. Inverts the pill. */
   active: boolean;
   /** Whether the hole cards are face up. Shown hands are always face up. */
   revealed: boolean;
+  /** Cards that play at showdown; face-up cards outside it dim. */
+  winningFive: ReadonlySet<Card>;
+  /** The hero's live made hand, shown as a caption over the pill. */
+  handLabel?: string | null;
 }
 
-/** One player around the table: their cards, their name and what they have left. */
-export function TableSeat({ seat, onButton, active, revealed }: TableSeatProps) {
+/**
+ * One player around the table: avatar and cards peeking over the name pill.
+ *
+ * The hero's seat drops the avatar and fans its two cards large and face up,
+ * the way the player would hold them; everyone else shows small backs.
+ */
+export function TableSeat({
+  seat,
+  onButton,
+  active,
+  revealed,
+  winningFive,
+  handLabel = null,
+}: TableSeatProps) {
   const { colors } = useTheme();
   const out = seat.status === 'folded' || seat.status === 'sittingOut';
   const faceUp = revealed || seat.shown;
   // A seat that folded or mucked has no cards in front of it any more.
   const holeCards = out || seat.mucked ? null : seat.holeCards;
+  const dims = (card: Card): boolean => faceUp && winningFive.size > 0 && !winningFive.has(card);
 
   return (
     <View style={[styles.wrapper, out && styles.out]} accessibilityLabel={label(seat)}>
-      <View style={styles.cards}>
+      <View style={styles.peek}>
+        {!revealed && <SeatAvatar name={seat.id} crowned={seat.won > 0} />}
         {holeCards ? (
-          holeCards.map((card) => (
-            <PlayingCard
-              key={card}
-              size="small"
-              card={faceUp ? card : undefined}
-              faceDown={!faceUp}
-            />
+          holeCards.map((card, index) => (
+            <View key={card} style={cardStyle(revealed, index)}>
+              <PlayingCard
+                size={revealed ? 'large' : 'small'}
+                card={faceUp ? card : undefined}
+                faceDown={!faceUp}
+                dimmed={dims(card)}
+              />
+            </View>
           ))
         ) : (
           <View style={styles.cardSpacer} />
         )}
       </View>
 
-      <View
-        style={[
-          styles.plate,
-          { backgroundColor: colors.feltRail },
-          active && { borderColor: colors.tint },
-          seat.won > 0 && { borderColor: colors.success },
-        ]}>
-        <Text variant="caption" numberOfLines={1} style={{ color: colors.onFelt }}>
-          {seat.id}
-        </Text>
-        <Text
-          variant="footnote"
-          tabular
-          numberOfLines={1}
-          style={{ color: seat.stack === 0 ? colors.warning : colors.onFelt }}>
-          {seat.stack === 0 && seat.status === 'allIn' ? 'All in' : formatChips(seat.stack)}
-        </Text>
-      </View>
+      {handLabel !== null && (
+        <View style={[styles.handLabel, { backgroundColor: colors.feltOverlay }]}>
+          <Text variant="caption" numberOfLines={1} style={{ color: colors.onFelt }}>
+            {handLabel}
+          </Text>
+        </View>
+      )}
+
+      <SeatPill seat={seat} active={active} />
 
       {onButton && (
         <View
@@ -84,31 +98,53 @@ function label(seat: ReplaySeat): string {
   return `${seat.id}, ${formatChips(seat.stack)} behind`;
 }
 
+/** The hero's cards fan apart; an opponent's backs just overlap. */
+function cardStyle(revealed: boolean, index: number) {
+  if (revealed) {
+    return index === 0 ? styles.heroCard : styles.heroSecond;
+  }
+
+  return index === 1 ? styles.backSecond : undefined;
+}
+
 const styles = StyleSheet.create({
   wrapper: {
     width: SEAT_WIDTH,
     height: SEAT_HEIGHT,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: spacing.xs,
   },
   out: {
     opacity: 0.4,
   },
-  cards: {
+  // Avatar and cards sit behind the pill, peeking over its top edge.
+  peek: {
     flexDirection: 'row',
-    gap: 2,
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+    marginBottom: -spacing.md,
+    zIndex: 0,
+  },
+  backSecond: {
+    marginLeft: -spacing.sm,
+  },
+  heroCard: {
+    transform: [{ rotate: '-4deg' }],
+  },
+  heroSecond: {
+    marginLeft: -spacing.base,
+    transform: [{ rotate: '5deg' }],
   },
   cardSpacer: {
     height: 42,
   },
-  plate: {
-    width: SEAT_WIDTH,
-    alignItems: 'center',
+  handLabel: {
+    maxWidth: SEAT_WIDTH * 1.5,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
-    borderRadius: radius.sm,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderRadius: radius.full,
+    marginBottom: spacing.xs / 2,
+    zIndex: 1,
   },
   button: {
     position: 'absolute',
