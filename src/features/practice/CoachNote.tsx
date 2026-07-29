@@ -1,33 +1,21 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { type DecisionReview, type Grade } from '@/engine';
+import { type DecisionReview } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
+
+import { GRADE_LABELS, GRADE_TONES } from './coachCopy';
 
 export interface CoachNoteProps {
   /** The decision worth talking about, or null when there is nothing to say. */
   review: DecisionReview | null;
   /** How many decisions were graded, so a single note can say what it is one of. */
   total: number;
+  /** Opens the full review. The note is a summary; this is the way into the rest. */
+  onPress?: () => void;
 }
-
-const GRADE_LABELS: Record<Grade, string> = {
-  correct: 'Correct',
-  marginal: 'Marginal',
-  mistake: 'Mistake',
-  blunder: 'Blunder',
-};
-
-type Tone = 'success' | 'warning' | 'danger' | 'secondaryLabel';
-
-const GRADE_TONES: Record<Grade, Tone> = {
-  correct: 'success',
-  marginal: 'warning',
-  mistake: 'danger',
-  blunder: 'danger',
-};
 
 /**
  * The coach's verdict on one decision.
@@ -36,7 +24,7 @@ const GRADE_TONES: Record<Grade, Tone> = {
  * rounded into a different claim or softened into one the math did not make —
  * the whole product rests on the grade being trustworthy.
  */
-export function CoachNote({ review, total }: CoachNoteProps) {
+export function CoachNote({ review, total, onPress }: CoachNoteProps) {
   const { colors } = useTheme();
 
   if (!review) {
@@ -44,12 +32,8 @@ export function CoachNote({ review, total }: CoachNoteProps) {
   }
 
   const tone = GRADE_TONES[review.grade];
-
-  return (
-    <View
-      accessibilityRole="summary"
-      accessibilityLabel={`${GRADE_LABELS[review.grade]}. ${review.reason}`}
-      style={[styles.card, { backgroundColor: colors.secondaryBackground }]}>
+  const body = (
+    <>
       <View style={styles.header}>
         <Text variant="footnote" tone={tone} style={styles.grade}>
           {GRADE_LABELS[review.grade].toUpperCase()}
@@ -68,7 +52,38 @@ export function CoachNote({ review, total }: CoachNoteProps) {
           Your costliest of {total} decisions this hand
         </Text>
       )}
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View
+        accessibilityRole="summary"
+        accessibilityLabel={`${GRADE_LABELS[review.grade]}. ${review.reason}`}
+        style={[styles.card, { backgroundColor: colors.secondaryBackground }]}>
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${GRADE_LABELS[review.grade]}. ${review.reason}`}
+      accessibilityHint="Opens the session review"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: colors.secondaryBackground },
+        pressed && styles.pressed,
+      ]}>
+      <View style={styles.pressableRow}>
+        <View style={styles.body}>{body}</View>
+        <Text variant="body" tone="tertiaryLabel">
+          ›
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -76,6 +91,15 @@ const styles = StyleSheet.create({
   card: {
     padding: spacing.md,
     borderRadius: radius.md,
+    gap: spacing.xs,
+  },
+  pressableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  body: {
+    flex: 1,
     gap: spacing.xs,
   },
   header: {
@@ -86,5 +110,8 @@ const styles = StyleSheet.create({
   grade: {
     letterSpacing: 0.6,
     fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

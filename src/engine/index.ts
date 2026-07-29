@@ -180,6 +180,17 @@ export {
 } from './coach';
 
 export {
+  bestDecision,
+  costliestDecision,
+  summarizeSession,
+  tallyLeaks,
+  topLeaks,
+  type LeakTally,
+  type SessionCoachRecord,
+  type SessionSummary,
+} from './leaks';
+
+export {
   chenScore,
   modelOpponents,
   strengthOf,

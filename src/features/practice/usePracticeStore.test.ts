@@ -121,6 +121,40 @@ describe('usePracticeStore', () => {
     }
   });
 
+  it('grades the hero once the hand is over, and only the hero', () => {
+    expect(read().reviews).toEqual([]);
+
+    read().act({ type: 'fold' });
+
+    const { hand, reviews } = read();
+
+    expect(hand.complete).toBe(true);
+    expect(reviews.length).toBeGreaterThan(0);
+    expect(reviews.every((review) => review.seat === HERO_SEAT)).toBe(true);
+  });
+
+  it('books the grades with the hand and starts the next one clean', () => {
+    read().act({ type: 'fold' });
+
+    const played = read().hand;
+    const graded = read().reviews;
+    const net = (played.players[HERO_SEAT]?.stack ?? 0) - (read().handSeats[HERO_SEAT]?.stack ?? 0);
+
+    read().nextHand();
+
+    expect(read().coachHistory).toEqual([{ handNumber: played.handNumber, net, reviews: graded }]);
+    expect(read().reviews).toEqual([]);
+  });
+
+  it('clears the coaching on reset', () => {
+    read().act({ type: 'fold' });
+    read().nextHand();
+    read().reset();
+
+    expect(read().reviews).toEqual([]);
+    expect(read().coachHistory).toEqual([]);
+  });
+
   it('replays identically from the same seed', () => {
     read().act({ type: 'call' });
 

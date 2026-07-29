@@ -6,6 +6,89 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-29 — Phase 3, slice 2: the leak tracker and the session review
+
+The coach's verdicts add up to something. A review sheet off the table shows how
+the session is going, the three habits costing the most, and every graded
+decision from the last hand — the PRD's leak tracker and session summary,
+session-scoped.
+
+| File | What |
+| --- | --- |
+| `src/engine/leaks.ts` | `tallyLeaks`, `topLeaks`, `costliestDecision`, `bestDecision`, `summarizeSession` |
+| `src/features/practice/usePracticeStore.ts` | grades finished hands, accumulates `coachHistory` |
+| `src/features/practice/SessionReviewScreen.tsx` | the sheet: summary, leaks, decisions |
+| `src/features/practice/DecisionRow.tsx`, `LeakSummary.tsx`, `coachCopy.ts` | its parts and their words |
+| `src/components/ui/StatRow.tsx` | label-left value-right row, extracted on its third use |
+| `app/table/review.tsx` | formSheet route; the coach note on the felt opens it |
+
+436 tests passing, up from 412. Typecheck and lint clean. No new dependencies.
+
+### Decisions worth knowing about
+
+**Aggregation is engine code, in its own module.** `coach.ts` grades one
+decision and is already at the file cap; answering "what habit is costing me"
+is a different responsibility and a pure fold over `DecisionReview[]`. The
+future cross-session dashboard reads the same functions.
+
+**Grading moved out of the hook and into the store.** Three consumers now need
+the same reviews — the felt's coach note, the review sheet, and the session
+books — so the store computes them once when a hand completes, and
+`useHandCoach` shrank to a selector. `coachHistory` records `{ handNumber, net,
+reviews }` per finished hand; it is local play data, the same category as
+`hand` and `session`, not server cache.
+
+**Leaks are ranked by chips given up, not by count.** Three cheap positional
+slips matter less than one habitual bad call, and the order should say so. The
+"focus" line is simply the top leak's one-line fix from `LEAK_FOCUS`.
+
+**"Best decision" means the correct one with the most at stake.** Every correct
+decision ties at zero EV lost, so lowest-loss cannot rank them; the biggest pot
+navigated correctly is the one that took nerve.
+
+**The review lives in `src/features/practice`, not a new `tracker` feature.**
+It reads `usePracticeStore`, and features may not import each other's
+internals. The tracker feature is born when SQLite persistence gives it its own
+repository-backed data source.
+
+**Trend lines are deferred with persistence, deliberately.** Nothing persists
+yet, and an in-session trend over ~20 hands is the same small-sample trap this
+log already records twice. A trend the tracker cannot back would be the coach
+lying with a chart.
+
+### Traps that cost real time
+
+**A decision renders in two places, and tests must expect that.** The costliest
+decision appears under Highlights *and* in the last hand's list, so
+`getByText(/Folded/)` fails on "found multiple elements". Not a bug — the same
+verdict shown twice is the design — but the assertions have to be
+`getAllByText`.
+
+**`prettier --check` runs after ESLint in `npm run lint`** — an auto-fixed
+import order still fails the script until Prettier has run over the same files.
+
+### Known gaps
+
+- **No simulator pass.** This slice was built in a remote Linux container with
+  no iOS simulator. The formSheet-over-native-tabs presentation and both color
+  schemes are exactly what a simulator or device has to confirm before this is
+  called done; tests cannot see either. Flagged in the PR rather than claimed.
+- **Only the last hand's decisions are listed.** Earlier hands are in
+  `coachHistory` and summarized, but there is no per-hand browser yet.
+- **Nothing persists.** Close the app and the session review is gone. SQLite,
+  and the trends it makes honest, are their own slice.
+- **The evLoss shown is chips, not big blinds.** One blind level exists today,
+  so they differ only by a constant; when levels vary the display should
+  convert per hand.
+
+### Next
+
+The LLM explanation layer over the coach's facts, or SQLite persistence for
+hands and reviews — whichever the next session picks, the reviews it needs are
+now accumulated and typed.
+
+---
+
 ## 2026-07-29 — Phase 3, slice 1: the coach grades a decision
 
 Pillar C opens. Every decision the player makes is graded against the math, with
