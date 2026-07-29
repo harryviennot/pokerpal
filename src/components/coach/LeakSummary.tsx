@@ -1,8 +1,9 @@
-import { LEAK_LABELS } from '@/components/coach/coachCopy';
 import { StatRow } from '@/components/ui/StatRow';
 import { Text } from '@/components/ui/Text';
 import { type LeakTally } from '@/engine';
 import { formatChips } from '@/utils/format';
+
+import { LEAK_LABELS } from './coachCopy';
 
 export interface LeakSummaryProps {
   /** Costliest first, at most three — `topLeaks` output. */

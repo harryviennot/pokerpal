@@ -172,9 +172,76 @@ function describeHandHistoryRepo(name: string, makeRepo: () => HandHistoryRepo):
       expect(await repo.totals()).toEqual({ hands: 2, net: 95, decisionsGraded: 1 });
     });
 
+    it('counts each session once, newest first', async () => {
+      const early = await repo.createSession({ ...SESSION, startedAt: 100 });
+      const late = await repo.createSession({ ...SESSION, startedAt: 900 });
+
+      await repo.saveHand(
+        hand(early, {
+          handNumber: 1,
+          heroNet: 40,
+          reviews: [review(), review({ grade: 'blunder', evLoss: 30, leak: 'overBluffing' })],
+        }),
+      );
+      await repo.saveHand(hand(early, { handNumber: 2, heroNet: -15, reviews: [] }));
+      await repo.saveHand(hand(late, { handNumber: 1, heroNet: 5, reviews: [review()] }));
+
+      const stats = await repo.listSessions();
+
+      expect(stats.map((stat) => stat.sessionId)).toEqual([late, early]);
+      // Two hands and two reviews: the net must not be counted once per review.
+      expect(stats[1]).toMatchObject({
+        startedAt: 100,
+        hands: 2,
+        net: 25,
+        decisionsGraded: 2,
+        mistakes: 1,
+        evLost: 30,
+      });
+      expect(stats[0]).toMatchObject({ hands: 1, decisionsGraded: 1, mistakes: 0 });
+    });
+
+    it('leaves out a session that never stored a hand, and respects the limit', async () => {
+      const used = await repo.createSession({ ...SESSION, startedAt: 100 });
+
+      await repo.createSession({ ...SESSION, startedAt: 900 });
+      await repo.saveHand(hand(used));
+
+      expect((await repo.listSessions()).map((stat) => stat.sessionId)).toEqual([used]);
+      expect(await repo.listSessions({ limit: 0 })).toEqual([]);
+    });
+
+    it('tallies every leak it has ever stored, costliest first', async () => {
+      const sessionId = await repo.createSession(SESSION);
+
+      await repo.saveHand(
+        hand(sessionId, {
+          handNumber: 1,
+          reviews: [
+            review({ grade: 'mistake', evLoss: 12, leak: 'chasingWithoutOdds' }),
+            review({ grade: 'mistake', evLoss: 40, leak: 'preflopLooseness' }),
+            review(),
+          ],
+        }),
+      );
+      await repo.saveHand(
+        hand(sessionId, {
+          handNumber: 2,
+          reviews: [review({ grade: 'blunder', evLoss: 8, leak: 'chasingWithoutOdds' })],
+        }),
+      );
+
+      expect(await repo.leakTotals()).toEqual([
+        { leak: 'preflopLooseness', count: 1, evLoss: 40 },
+        { leak: 'chasingWithoutOdds', count: 2, evLoss: 20 },
+      ]);
+    });
+
     it('starts empty', async () => {
       expect(await repo.listHands()).toEqual([]);
       expect(await repo.totals()).toEqual({ hands: 0, net: 0, decisionsGraded: 0 });
+      expect(await repo.listSessions()).toEqual([]);
+      expect(await repo.leakTotals()).toEqual([]);
     });
 
     it('refuses a hand for a session it has never seen', async () => {

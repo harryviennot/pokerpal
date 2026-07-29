@@ -1,6 +1,7 @@
 import { cleanup, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
+import { type DecisionFacts, type DecisionReview } from '@/engine';
 import {
   installMemoryHandHistoryRepo,
   PersistenceError,
@@ -31,6 +32,32 @@ const SESSION = {
   blinds: { smallBlind: 5, bigBlind: 10 },
 } as const;
 
+const FACTS: DecisionFacts = {
+  street: 'flop',
+  playersBehind: 1,
+  pot: 60,
+  toCall: 20,
+  stack: 940,
+  spr: 15.7,
+  equity: 0.12,
+  requiredEquity: 0.25,
+  outs: 4,
+};
+
+function review(overrides: Partial<DecisionReview> = {}): DecisionReview {
+  return {
+    seat: 0,
+    action: { type: 'call' },
+    best: { type: 'fold' },
+    grade: 'mistake',
+    evLoss: 18,
+    reason: 'Called 33% of pot with 12% equity, needing 25%.',
+    leak: 'chasingWithoutOdds',
+    facts: FACTS,
+    ...overrides,
+  };
+}
+
 async function seedHands(repo: HandHistoryRepo): Promise<void> {
   const sessionId = await repo.createSession(SESSION);
   const base = {
@@ -43,7 +70,13 @@ async function seedHands(repo: HandHistoryRepo): Promise<void> {
   } as const;
 
   await repo.saveHand({ ...base, handNumber: 1, playedAt: 1_000, heroNet: 140, reviews: [] });
-  await repo.saveHand({ ...base, handNumber: 2, playedAt: 2_000, heroNet: -60, reviews: [] });
+  await repo.saveHand({
+    ...base,
+    handNumber: 2,
+    playedAt: 2_000,
+    heroNet: -60,
+    reviews: [review(), review({ grade: 'correct', evLoss: 0, leak: null })],
+  });
 }
 
 afterEach(async () => {
@@ -65,6 +98,32 @@ describe('HistoryScreen', () => {
     expect(screen.getByText('Hand #1')).toBeOnTheScreen();
     expect(screen.getByText('+140')).toBeOnTheScreen();
     expect(screen.getByText('-60')).toBeOnTheScreen();
+  });
+
+  it('ranks the leaks across every session and names the focus', async () => {
+    const repo = installMemoryHandHistoryRepo();
+
+    await seedHands(repo);
+    await render(<HistoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('YOUR TOP 3 LEAKS')).toBeOnTheScreen());
+
+    expect(screen.getByText('Chasing without the odds ×1')).toBeOnTheScreen();
+    expect(screen.getByText('−18')).toBeOnTheScreen();
+    expect(screen.getByText(/^Focus: Before calling with a draw/)).toBeOnTheScreen();
+  });
+
+  it('charts the mistake rate but withholds a direction on one session', async () => {
+    const repo = installMemoryHandHistoryRepo();
+
+    await seedHands(repo);
+    await render(<HistoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('MISTAKE RATE')).toBeOnTheScreen());
+
+    // One mistake in two graded decisions, over the single seeded session.
+    expect(screen.getByText('50.0')).toBeOnTheScreen();
+    expect(screen.getByText(/starts reading as a trend/)).toBeOnTheScreen();
   });
 
   it('opens the hand a row is tapped on', async () => {

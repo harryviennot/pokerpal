@@ -2,19 +2,28 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator } from 'react-native';
 
+import { LEAK_FOCUS } from '@/components/coach/coachCopy';
+import { LeakSummary } from '@/components/coach/LeakSummary';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
+import { Text } from '@/components/ui/Text';
 import { formatChips } from '@/utils/format';
 
 import { HandHistoryRow } from './HandHistoryRow';
+import { MistakeTrend } from './MistakeTrend';
 import { useHandHistory } from './useHandHistory';
 
+/** The PRD's "your top 3 leaks", across every session rather than one. */
+const TOP_LEAKS = 3;
+
 /**
- * The tracker's first surface: every hand ever played on this device, newest
- * first, with the all-time ledger above it. Reads the hand-history repository;
- * the live session belongs to the table and its review sheet.
+ * The tracker's surface: the all-time ledger, whether the mistakes are getting
+ * rarer, the habits costing the most, and every hand ever played on this device.
+ *
+ * Reads the hand-history repository, so everything here is across all sessions;
+ * how tonight is going belongs to the table's review sheet.
  */
 export function HistoryScreen() {
   const { state, reload } = useHandHistory();
@@ -50,7 +59,9 @@ export function HistoryScreen() {
     );
   }
 
-  const { totals } = state;
+  const { totals, leaks } = state;
+  const top = leaks.slice(0, TOP_LEAKS);
+  const focus = top[0]?.leak;
 
   return (
     <Screen scroll>
@@ -62,6 +73,17 @@ export function HistoryScreen() {
           tone={totals.net > 0 ? 'success' : totals.net < 0 ? 'danger' : 'label'}
         />
         <StatRow label="Decisions graded" value={String(totals.decisionsGraded)} />
+      </Section>
+
+      <MistakeTrend sessions={state.sessions} />
+
+      <Section title="Your top 3 leaks">
+        <LeakSummary leaks={top} />
+        {focus && (
+          <Text variant="footnote" tone="secondaryLabel">
+            Focus: {LEAK_FOCUS[focus]}
+          </Text>
+        )}
       </Section>
 
       <Section title="Hands">

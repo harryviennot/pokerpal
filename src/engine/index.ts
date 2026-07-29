@@ -131,6 +131,17 @@ export { bigBlindSeat, dealStreet, nextStreet, openHand } from './deal';
 export { applyAction, dealHand, startHand } from './hand';
 
 export {
+  isMistake,
+  mistakeRate,
+  summarizeTrend,
+  MIN_DECISIONS,
+  MIN_POINTS,
+  type Trend,
+  type TrendDirection,
+  type TrendPoint,
+} from './trends';
+
+export {
   replayHand,
   reviewsByFrame,
   snapshotPot,

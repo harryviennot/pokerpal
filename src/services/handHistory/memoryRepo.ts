@@ -6,6 +6,8 @@
  * test and any future preview screen.
  */
 
+import { isMistake, tallyLeaks } from '@/engine';
+
 import {
   PersistenceError,
   type HandHistoryRepo,
@@ -14,6 +16,7 @@ import {
   type SessionId,
   type StoredHand,
   type StoredHandSummary,
+  type StoredSessionStat,
 } from './repo';
 
 interface MemoryHand extends NewHandRecord {
@@ -101,6 +104,42 @@ export function createMemoryHandHistoryRepo(): HandHistoryRepo {
         events: hand.events,
         reviews: hand.reviews,
       });
+    },
+
+    listSessions(options) {
+      const stats: StoredSessionStat[] = [];
+
+      for (const [sessionId, session] of sessions) {
+        const played = hands.filter((hand) => hand.sessionId === sessionId);
+
+        if (played.length === 0) {
+          continue;
+        }
+
+        const reviews = played.flatMap((hand) => [...hand.reviews]);
+
+        stats.push({
+          sessionId,
+          startedAt: session.startedAt,
+          hands: played.length,
+          net: played.reduce((sum, hand) => sum + hand.heroNet, 0),
+          decisionsGraded: reviews.length,
+          mistakes: reviews.filter((review) => isMistake(review.grade)).length,
+          evLost: reviews.reduce((sum, review) => sum + review.evLoss, 0),
+        });
+      }
+
+      const newestFirst = stats.sort(
+        (a, b) => b.startedAt - a.startedAt || b.sessionId - a.sessionId,
+      );
+
+      return Promise.resolve(
+        options?.limit === undefined ? newestFirst : newestFirst.slice(0, options.limit),
+      );
+    },
+
+    leakTotals() {
+      return Promise.resolve(tallyLeaks(hands.flatMap((hand) => [...hand.reviews])));
     },
 
     totals() {

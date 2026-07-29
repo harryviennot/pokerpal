@@ -21,6 +21,7 @@ export {
   type SessionId,
   type StoredHand,
   type StoredHandSummary,
+  type StoredSessionStat,
 } from './repo';
 
 let repoPromise: Promise<HandHistoryRepo> | null = null;
