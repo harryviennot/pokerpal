@@ -43,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0e29699b-e714-45b6-9a0f-b5f6967147e5"
+      }
+    },
+    "owner": "harrys-expo-org"
   }
 }
