@@ -108,6 +108,29 @@ export function currentBlinds(session: SessionState): BlindLevel {
 }
 
 /**
+ * Moves the session to `level`, clamped to the ladder; never moves backwards.
+ *
+ * The seam for a wall clock. `handsPerLevel` counts hands, which is the wrong
+ * unit for a tournament that raises blinds every three minutes: a timer above
+ * the engine works out which level the session is on and states it here. Both
+ * are safe together — whichever is further up the ladder wins, because this
+ * never goes back down.
+ *
+ * Clamping rather than throwing is the point: a clock that has run past the last
+ * level is how every long session ends, not an error. The same session comes
+ * back by identity when there is nothing to do, so a driver ticking every second
+ * allocates nothing and re-renders nothing.
+ */
+export function advanceToLevel(session: SessionState, level: number): SessionState {
+  // A non-finite level would sail through the clamp and leave `currentBlinds`
+  // indexing the ladder with NaN, which reads as blinds that do not exist.
+  const wanted = Number.isFinite(level) ? Math.floor(level) : session.level;
+  const next = Math.min(Math.max(wanted, session.level), session.levels.length - 1);
+
+  return next === session.level ? session : { ...session, level: next };
+}
+
+/**
  * Deals the next hand: rebuys where allowed, moves the button, applies the
  * current blind level and returns the session alongside the live hand.
  *

@@ -156,6 +156,7 @@ export {
 } from './replay';
 
 export {
+  advanceToLevel,
   currentBlinds,
   finishHand,
   isSessionOver,
@@ -185,10 +186,12 @@ export {
 } from './archetypes';
 
 export {
+  decisionPoints,
   reviewDecision,
   reviewHand,
   type CoachOptions,
   type DecisionFacts,
+  type DecisionPoint,
   type DecisionReview,
   type Grade,
   type Leak,

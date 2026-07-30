@@ -1,5 +1,15 @@
+import { gradeHand, playHand, HERO_SEAT } from '@/fixtures/playedHand';
+
 import { allCards, parseCards, type Card } from './cards';
-import { reviewDecision, reviewHand, type Grade } from './coach';
+import {
+  decisionPoints,
+  reviewDecision,
+  reviewHand,
+  type CoachOptions,
+  type DecisionReview,
+  type Grade,
+} from './coach';
+import { type HandEvent, type LoggedAction, type SeatIndex } from './events';
 import { applyAction, dealHand, startHand } from './hand';
 import { createRng } from './rng';
 import { type Action, type HandState, type TableConfig } from './table';
@@ -230,5 +240,148 @@ describe('reviewHand', () => {
     expect(reviewHand(CONFIG, played.events, 2, coach())).toEqual([]);
   });
 });
+
+describe('decisionPoints', () => {
+  it('returns every state the seat faced, in the order they faced them', () => {
+    const played = playHand();
+    const points = decisionPoints(FIXTURE_CONFIG, played.events, HERO_SEAT);
+
+    // The fixture checks and calls to showdown, so hero acts once per street.
+    expect(points.map((point) => point.state.street)).toEqual(['preflop', 'flop', 'turn', 'river']);
+    expect(points.map((point) => point.action.type)).toEqual(['call', 'check', 'check', 'check']);
+    expect(points.every((point) => point.state.toAct === HERO_SEAT)).toBe(true);
+  });
+
+  it('is empty for a seat that never acted, and for a log with no opening event', () => {
+    const played = play(startHand(CONFIG, createRng(8)), [{ type: 'fold' }, { type: 'fold' }]);
+
+    expect(decisionPoints(CONFIG, played.events, 2)).toEqual([]);
+    expect(decisionPoints(CONFIG, [], 0)).toEqual([]);
+  });
+
+  it('grades the same way one point at a time as reviewHand does in one pass', () => {
+    // The contract the store leans on: it walks these front to back, one per
+    // event-loop tick, sharing a single Rng. Any other order is other verdicts.
+    const played = playHand();
+    // One Rng for the whole walk, not one per point: the samples a decision draws
+    // depend on how many were drawn before it, so a fresh Rng per tick is a
+    // different coach, not a chunked one.
+    const shared = FIXTURE_COACH();
+    const chunked = decisionPoints(FIXTURE_CONFIG, played.events, HERO_SEAT).flatMap((point) => {
+      const review = reviewDecision(point.state, point.action, shared);
+
+      return review ? [review] : [];
+    });
+
+    expect(chunked).toEqual(reviewHand(FIXTURE_CONFIG, played.events, HERO_SEAT, FIXTURE_COACH()));
+  });
+});
+
+describe('reviewHand after the decisionPoints extraction', () => {
+  it('returns exactly what the single-pass implementation returned', () => {
+    const played = playHand();
+
+    expect(reviewHand(FIXTURE_CONFIG, played.events, HERO_SEAT, FIXTURE_COACH())).toEqual(
+      singlePassReviewHand(FIXTURE_CONFIG, played.events, HERO_SEAT, FIXTURE_COACH()),
+    );
+  });
+
+  it('still produces the verdicts captured before the extraction', () => {
+    // Captured by running the pre-extraction code against this fixture. The
+    // equities are the load-bearing part: they come off the shared Rng, so they
+    // pin the order the decisions were graded in, which is the one thing the
+    // extraction could have changed and the shape of the result cannot show.
+    expect(
+      gradeHand(playHand()).map((review) => [
+        review.facts.street,
+        review.action.type,
+        review.grade,
+        review.evLoss,
+        review.facts.equity,
+      ]),
+    ).toEqual([
+      ['preflop', 'call', 'correct', 0, 0.4666666666666666],
+      ['flop', 'check', 'correct', 0, 0.42],
+      ['turn', 'check', 'correct', 0, 0.17],
+      ['river', 'check', 'correct', 0, 0.04],
+    ]);
+  });
+});
+
+/** The table `@/fixtures/playedHand` deals from, so a review can be re-run here. */
+const FIXTURE_CONFIG: TableConfig = {
+  seats: [
+    { id: 'You', stack: 1000 },
+    { id: 'Ava', stack: 1000 },
+    { id: 'Ben', stack: 1000 },
+  ],
+  button: 0,
+  blinds: { smallBlind: 5, bigBlind: 10 },
+  handNumber: 1,
+  seed: 42,
+};
+
+/** The fixture's own sampling: light, and a fresh Rng so runs are comparable. */
+const FIXTURE_COACH = (): CoachOptions => ({ iterations: 50, rng: createRng(42) });
+
+/**
+ * `reviewHand` as it stood before `decisionPoints` was extracted: one pass over
+ * the log, grading in place.
+ *
+ * Kept here so the extraction has something to be equal to. The risk it guards
+ * is invisible in the result's shape — `reviewDecision` draws from the shared
+ * Rng, so collecting the states first and grading them afterwards is only safe
+ * while the grading order is unchanged.
+ */
+function singlePassReviewHand(
+  config: TableConfig,
+  events: readonly HandEvent[],
+  seat: SeatIndex,
+  options: CoachOptions,
+): DecisionReview[] {
+  const opening = events.find((event) => event.type === 'handStart');
+
+  if (!opening || opening.type !== 'handStart') {
+    return [];
+  }
+
+  const reviews: DecisionReview[] = [];
+  let state = dealHand(config, opening.deck);
+
+  for (const event of events) {
+    if (event.type !== 'actionTaken') {
+      continue;
+    }
+
+    const action = loggedToAction(event.action);
+
+    if (event.seat === seat) {
+      const review = reviewDecision(state, action, options);
+
+      if (review) {
+        reviews.push(review);
+      }
+    }
+
+    state = applyAction(state, action);
+  }
+
+  return reviews;
+}
+
+function loggedToAction(logged: LoggedAction): Action {
+  switch (logged.type) {
+    case 'bet':
+      return { type: 'bet', to: logged.to };
+    case 'raise':
+      return { type: 'raise', to: logged.to };
+    case 'call':
+      return { type: 'call' };
+    case 'check':
+      return { type: 'check' };
+    default:
+      return { type: 'fold' };
+  }
+}
 
 const GRADES: readonly Grade[] = ['correct', 'marginal', 'mistake', 'blunder'];

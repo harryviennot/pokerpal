@@ -45,9 +45,11 @@ module.exports = {
       transformIgnorePatterns,
       resolver: '<rootDir>/jest.resolver.js',
       setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+      // Order matters: Jest takes the first pattern that matches, and
+      // `^@/(.*)$` would swallow `@/assets/...` into `src/assets/...`.
       moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1',
         '^@/assets/(.*)$': '<rootDir>/assets/$1',
+        '^@/(.*)$': '<rootDir>/src/$1',
       },
     },
   ],

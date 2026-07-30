@@ -79,7 +79,104 @@ export interface ColorTokens {
   cardFaceDimmed: string;
   /** Translucent scrim for the pot caption and winner banner on the felt. */
   feltOverlay: string;
+
+  // The arena: the game screen's own palette. Sampled from the reference
+  // design, and deliberately identical in light and dark — the felt is a lit
+  // stage, and a stage that dims with the OS reads as a bug, not a preference.
+
+  /** The blue field the table floats on. */
+  arenaBackdrop: string;
+  /** Deep stop of that field's gradient, for its corners and lower edge. */
+  arenaBackdropDeep: string;
+  /** The pale diagonal slashes across the field. */
+  arenaStripe: string;
+  /** Electric highlight in the field, and small accents drawn over it. */
+  arenaAccent: string;
+
+  /** Committing actions: Fold, Call, Raise. Red because they cost chips. */
+  actionRed: string;
+  /** `actionRed` held down. Derived, not sampled: a still frame has no pressed state. */
+  actionRedPressed: string;
+  /** Text on `actionRed`. */
+  onActionRed: string;
+  /** Non-committing controls: Check, All-in, the bet-size presets, +/−. */
+  consoleGray: string;
+  /** `consoleGray` held down. Derived, like `actionRedPressed`. */
+  consoleGrayPressed: string;
+  /** Text on `consoleGray`. */
+  onConsoleGray: string;
+  /** A console control that is not available at all — darker, never faded. */
+  consoleDisabled: string;
+
+  /** A seat waiting its turn. */
+  pillDark: string;
+  /** Text on `pillDark`. */
+  onPillDark: string;
+  /** The seat on the clock: inverted, so the eye finds it without an animation. */
+  pillLight: string;
+  /** Text on `pillLight`. */
+  onPillLight: string;
+  /** A seat that folded. Grey rather than transparent, so the stack stays legible. */
+  pillFolded: string;
+
+  /** The hero's own name plate. */
+  platePlain: string;
+  /** The hero's plate when they won the pot. */
+  plateGold: string;
+  /** Gold border that makes `plateGold` read as a win at a glance. */
+  plateGoldBorder: string;
+
+  /** Diamonds in the four-color deck. Clubs stay green-free: only diamonds recolor. */
+  suitOrange: string;
+  /** Card back, light stop. */
+  cardBackRed: string;
+  /** Card back, dark stop of the same gradient. */
+  cardBackRedDeep: string;
+
+  /** Translucent status chip over the felt: live equity, all-in marker, timers. */
+  frostBadge: string;
+  /** Text on `frostBadge`. */
+  onFrostBadge: string;
+  /** A seat that is all-in. Loud, because it changes what every later action means. */
+  allInBadge: string;
+  /** Strip behind a caption sitting on artwork, e.g. the hero's made-hand line. */
+  captionScrim: string;
 }
+
+/**
+ * The arena palette, shared by both schemes.
+ *
+ * Spread into `light` and `dark` rather than duplicated, so the two can never
+ * drift apart by a hex digit.
+ */
+const arena = {
+  arenaBackdrop: '#2249FB',
+  arenaBackdropDeep: '#0418FD',
+  arenaStripe: '#A3C2EE',
+  arenaAccent: '#3085FD',
+  actionRed: '#B51721',
+  actionRedPressed: '#8E1219',
+  onActionRed: '#FFFFFF',
+  consoleGray: '#454858',
+  consoleGrayPressed: '#363948',
+  onConsoleGray: '#FFFFFF',
+  consoleDisabled: '#30333D',
+  pillDark: '#161A2E',
+  onPillDark: '#FFFFFF',
+  pillLight: '#EEEFF3',
+  onPillLight: '#050512',
+  pillFolded: '#6A6E7A',
+  platePlain: '#EEF0F1',
+  plateGold: '#E6E8EC',
+  plateGoldBorder: '#E4C112',
+  suitOrange: '#ED3E12',
+  cardBackRed: '#EF4463',
+  cardBackRedDeep: '#8B2244',
+  frostBadge: 'rgba(38, 42, 60, 0.6)',
+  onFrostBadge: '#FFFFFF',
+  allInBadge: '#E1444E',
+  captionScrim: 'rgba(45, 49, 67, 0.92)',
+} as const;
 
 const light: ColorTokens = {
   background: '#FFFFFF',
@@ -117,6 +214,7 @@ const light: ColorTokens = {
   cardBackAccent: '#5B7BD5',
   cardFaceDimmed: '#C6C9CF',
   feltOverlay: 'rgba(0, 0, 0, 0.35)',
+  ...arena,
 };
 
 const dark: ColorTokens = {
@@ -155,6 +253,7 @@ const dark: ColorTokens = {
   cardBackAccent: '#5B7BD5',
   cardFaceDimmed: '#9A9DA4',
   feltOverlay: 'rgba(0, 0, 0, 0.4)',
+  ...arena,
 };
 
 export const colors: Record<ColorScheme, ColorTokens> = { light, dark };

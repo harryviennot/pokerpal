@@ -2,39 +2,31 @@ import { useState } from 'react';
 import { type LayoutChangeEvent } from 'react-native';
 
 import { type SeatIndex } from '@/engine';
-import { spacing } from '@/theme';
 
-import { SEAT_HEIGHT, SEAT_WIDTH } from './TableSeat';
+import {
+  BUTTON_SIZE,
+  HERO_SEAT_HEIGHT,
+  HERO_SEAT_WIDTH,
+  PILL_HEIGHT,
+  SEAT_HEIGHT,
+  SEAT_WIDTH,
+} from './seatMetrics';
+import { slotFor, type Point } from './seatSlots';
 
 export interface TableSize {
   width: number;
   height: number;
 }
 
-export interface Point {
-  x: number;
-  y: number;
-}
+export type { Point };
 
 /**
- * How far a seat's chips sit in front of it, in points.
+ * Measures the felt and turns the slot tables into pixels.
  *
- * A fixed step towards the middle rather than a fraction of the radius: scaling
- * the ellipse moves the near seats barely at all and the far ones into the pot,
- * so no single fraction clears both the name plates and the middle.
- */
-export const BET_OFFSET = 64;
-
-/** Clearance between the edge of the table and the nearest seat box. */
-const RAIL = spacing.md;
-
-/**
- * Measures the table and hands out positions on its ellipse.
- *
- * Geometry comes from the measured size rather than fixed points so a
- * two-handed table and a nine-handed one lay out from the same rule. Callers
- * keep seats mounted and hide them until `measured` — layout never fires under
- * Jest, and unmounted seats would vanish from the accessibility tree.
+ * Every position is a fraction of the capsule's box (see `seatSlots`), so this
+ * only ever scales and centres. Callers keep seats mounted and hide them until
+ * `measured` — layout never fires under Jest, and unmounted seats would vanish
+ * from the accessibility tree.
  */
 export function useSeatGeometry(): {
   size: TableSize;
@@ -52,11 +44,20 @@ export function useSeatGeometry(): {
   return { size, measured: size.width > 0 && size.height > 0, onLayout };
 }
 
+/** The footprint of a seat's box, which the hero's larger cards widen. */
+export function seatBox(hero: boolean): TableSize {
+  return hero
+    ? { width: HERO_SEAT_WIDTH, height: HERO_SEAT_HEIGHT }
+    : { width: SEAT_WIDTH, height: SEAT_HEIGHT };
+}
+
 /**
- * Where a seat sits on the ellipse, as the top-left corner of a seat-sized box.
+ * The top-left corner of a seat's box on a felt of `size`.
  *
- * The hero is pinned to the bottom and the rest run round from there, so the
- * table always reads from the player's own chair.
+ * Slots anchor the *name plate's centre*, because the plate is the one part
+ * every seat has and the only part whose position the reference pins exactly.
+ * The box hangs above it — cards, made-hand plate — so the seat lays its
+ * contents out from the bottom up.
  */
 export function seatSpot(
   seat: SeatIndex,
@@ -64,32 +65,78 @@ export function seatSpot(
   count: number,
   size: TableSize,
 ): Point {
-  const step = (seat - heroSeat + count) % count;
-  // Screen y grows downwards, so a quarter turn is the bottom of the table and
-  // subtracting the step walks seats up the right-hand side first.
-  const angle = Math.PI / 2 - (2 * Math.PI * step) / count;
-  // Inset by half a seat plus the rail, so a whole seat — cards included — sits
-  // on the felt rather than hanging over the edge of the screen.
-  const rx = size.width / 2 - SEAT_WIDTH / 2 - RAIL;
-  const ry = size.height / 2 - SEAT_HEIGHT / 2 - RAIL;
+  const slot = slotFor(seat, heroSeat, count).seat;
+  const box = seatBox(seat === heroSeat);
 
-  return {
-    x: size.width / 2 + rx * Math.cos(angle) - SEAT_WIDTH / 2,
-    y: size.height / 2 + ry * Math.sin(angle) - SEAT_HEIGHT / 2,
-  };
+  return clamp(
+    {
+      x: slot.x * size.width - box.width / 2,
+      y: slot.y * size.height - box.height + PILL_HEIGHT / 2,
+    },
+    box,
+    size,
+  );
 }
 
-/** Steps a seat-sized box `distance` points straight at the middle of the table. */
-export function betSpot(from: Point, size: TableSize, distance: number = BET_OFFSET): Point {
-  const dx = size.width / 2 - SEAT_WIDTH / 2 - from.x;
-  const dy = size.height / 2 - SEAT_HEIGHT / 2 - from.y;
-  const length = Math.hypot(dx, dy);
+/**
+ * The top-left corner of a seat's chips, in a box the size of an opponent seat.
+ *
+ * Always a step in from the seat towards the middle of the felt, so a bet reads
+ * as chips pushed forward rather than a second badge on the plate.
+ */
+export function betSpot(
+  seat: SeatIndex,
+  heroSeat: SeatIndex,
+  count: number,
+  size: TableSize,
+): Point {
+  return centre(
+    slotFor(seat, heroSeat, count).bet,
+    { width: SEAT_WIDTH, height: SEAT_HEIGHT },
+    size,
+  );
+}
 
-  if (length === 0) {
-    return from;
-  }
+/**
+ * Which long edge of the capsule a seat leans against.
+ *
+ * Seats put their portrait on the outboard side, so nothing ever covers the
+ * middle of the felt. The hero, dead centre at the bottom, counts as left.
+ */
+export function seatSide(seat: SeatIndex, heroSeat: SeatIndex, count: number): 'left' | 'right' {
+  return slotFor(seat, heroSeat, count).seat.x > 0.5 ? 'right' : 'left';
+}
 
-  const step = Math.min(distance, length);
+/** The top-left corner of the dealer button when `seat` has it. */
+export function buttonSpot(
+  seat: SeatIndex,
+  heroSeat: SeatIndex,
+  count: number,
+  size: TableSize,
+): Point {
+  const box = { width: BUTTON_SIZE, height: BUTTON_SIZE };
 
-  return { x: from.x + (dx / length) * step, y: from.y + (dy / length) * step };
+  return centre(slotFor(seat, heroSeat, count).button, box, size);
+}
+
+/** Puts a box's centre on a fractional point, clamped onto the felt. */
+function centre(at: Point, box: TableSize, size: TableSize): Point {
+  return clamp(
+    { x: at.x * size.width - box.width / 2, y: at.y * size.height - box.height / 2 },
+    box,
+    size,
+  );
+}
+
+/**
+ * Keeps a box on the felt.
+ *
+ * The plates deliberately sit flush against the capsule's edge, so rounding or
+ * an unusually narrow felt would otherwise push one off the side.
+ */
+function clamp(at: Point, box: TableSize, size: TableSize): Point {
+  return {
+    x: Math.min(Math.max(at.x, 0), Math.max(0, size.width - box.width)),
+    y: Math.min(Math.max(at.y, 0), Math.max(0, size.height - box.height)),
+  };
 }

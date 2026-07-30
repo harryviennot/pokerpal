@@ -1,27 +1,21 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
+/**
+ * A stack above the tabs, so the game can cover them.
+ *
+ * The tab bar belongs to `(tabs)`, which is one screen of this stack; pushing
+ * `game` puts a native view controller over that whole screen, tab bar
+ * included. A game the player can tab away from mid-decision is a game they
+ * lose. Headers are off here because every child layout owns its own chrome.
+ */
 export default function RootLayout() {
   const scheme = useColorScheme();
 
   return (
     <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <NativeTabs>
-        <NativeTabs.Trigger name="(calculator)">
-          <NativeTabs.Trigger.Icon sf="percent" />
-          <NativeTabs.Trigger.Label>Calculator</NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="table">
-          <NativeTabs.Trigger.Icon sf="suit.spade.fill" />
-          <NativeTabs.Trigger.Label>Table</NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="history">
-          <NativeTabs.Trigger.Icon sf="clock" />
-          <NativeTabs.Trigger.Label>History</NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
-      </NativeTabs>
+      <Stack screenOptions={{ headerShown: false }} />
       <StatusBar style="auto" />
     </ThemeProvider>
   );

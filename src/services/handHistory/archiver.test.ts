@@ -82,6 +82,60 @@ describe('HandArchiver', () => {
     expect(await repo.listHands()).toHaveLength(1);
   });
 
+  it('reports no session until a hand has been written, then the one it wrote to', async () => {
+    const repo = createMemoryHandHistoryRepo();
+    let created = 0;
+    const counting: HandHistoryRepo = {
+      ...repo,
+      createSession: (session) => {
+        created += 1;
+
+        return repo.createSession(session);
+      },
+    };
+    const archiver = new HandArchiver(
+      () => Promise.resolve(counting),
+      META,
+      () => undefined,
+      () => 1_000,
+    );
+
+    expect(await archiver.currentSessionId()).toBeNull();
+    // Asking must not be what creates the row.
+    expect(created).toBe(0);
+
+    archiver.recordHand(archived(1));
+    await archiver.idle();
+
+    const [stored] = await repo.listHands();
+
+    expect(stored).toBeDefined();
+    expect(await archiver.currentSessionId()).toBe(stored?.sessionId);
+    expect(created).toBe(1);
+  });
+
+  it('reports no session when the session row failed to write', async () => {
+    const repo = createMemoryHandHistoryRepo();
+    const flaky: HandHistoryRepo = {
+      ...repo,
+      createSession: () => Promise.reject(new PersistenceError('write', 'Disk on fire.')),
+    };
+    const statuses: string[] = [];
+    const archiver = new HandArchiver(
+      () => Promise.resolve(flaky),
+      META,
+      (status) => statuses.push(status),
+    );
+
+    archiver.recordHand(archived(1));
+    await archiver.idle();
+
+    // The failure already reached the feature boundary once, through onStatus.
+    // Asking which session the hands went to must not throw it a second time.
+    expect(statuses).toEqual(['error']);
+    expect(await archiver.currentSessionId()).toBeNull();
+  });
+
   it('reports each failure and keeps the queue alive', async () => {
     const repo = createMemoryHandHistoryRepo();
     let failNext = true;

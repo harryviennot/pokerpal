@@ -182,6 +182,23 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
         };
       }),
 
+    listSessionHands: (sessionId) =>
+      guard('read', async () => {
+        const rows = await db.getAllAsync<HandSummaryRow>(
+          `SELECT h.id, h.session_id, h.hand_number, h.played_at, h.hero_net,
+                  COUNT(r.id) AS decisions_graded,
+                  COALESCE(SUM(r.ev_loss), 0) AS ev_lost
+           FROM hands h
+           LEFT JOIN decision_reviews r ON r.hand_id = h.id
+           WHERE h.session_id = ?
+           GROUP BY h.id
+           ORDER BY h.hand_number ASC`,
+          sessionId,
+        );
+
+        return rows.map(toSummary);
+      }),
+
     listSessions: (options) =>
       guard('read', async () => {
         // Correlated subqueries rather than one join: joining hands to their

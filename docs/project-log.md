@@ -6,6 +6,168 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-30 — The arena: a full-screen game above the tabs, bots that think, and two ways to play
+
+The game is no longer a tab with a header on top of it. It is a full-screen
+route pushed over the whole tab bar, the table tab became a lobby you configure
+*before* you play, and the bottom of the screen stopped being a stack of panels.
+Modeled closely on the Betclic-style reference screenshots in `reference/`.
+
+Six changes, each large enough to have been its own slice:
+
+1. **Routes.** The root is a `Stack`; the tabs live in `(tabs)/` and the game is
+   `/game`, with `/game/review` (formSheet), `/game/summary` and
+   `/game/hand/[id]` as siblings so a replay opens above the tabs too.
+2. **The store paces itself.** `playUntilSeat`'s synchronous loop is gone from
+   the play path. `useGameStore` runs a pump that applies one bot action per
+   scheduled tick and reveals one event per tick, so a hand plays out instead of
+   snapping to its result.
+3. **The felt is the supplied art.** `table-arena.png` drawn through a measured
+   mapping, on a Skia backdrop of the reference's blue field and diagonal
+   slashes. Seats sit on slot tables measured off the screenshots.
+4. **The console floats.** Fold/Call/Raise in red over the backdrop with a
+   vertical preset stack (All-in, Pot, x3.0/x2.5 preflop or 65%/35% postflop)
+   and a ±big-blind stepper. No panel, no card, nothing boxing it in.
+5. **Coaching became a notification.** The post-hand verdict slides in from the
+   top, auto-dismisses, and taps through to the review sheet — which is now
+   reached from a button in the top-right corner.
+6. **Two modes.** Learning has unlimited time and live equity; Real Game has a
+   20-second decision clock, blinds that climb every three minutes, no help
+   while you play, and a summary at the end that replays your best and worst
+   hand with the coach's reason for each.
+
+| File | What |
+| --- | --- |
+| `app/_layout.tsx`, `app/(tabs)/`, `app/game/` | root Stack; tabs moved under `(tabs)`; `/game` + review/summary/hand routes. `app/table/` deleted |
+| `src/features/game/useGameStore.ts` + `gamePump`, `gameScheduler`, `pacing`, `preselect`, `grading`, `handRecord` | the paced store: one action per tick, three RNG streams, chunked grading, wall-clock blind levels |
+| `src/features/game/GameScreen.tsx` + `TopBar`, `ActionConsole`, `ActionRow`, `PreselectRow`, `PresetStack`, `ConsoleButton`, `DecisionClock`, `AdviceBanner`, `betPresets`, `useShownFrame`, `useLiveEquity`, `useRunoutEquity`, `useChunkedEquity` | the arena chrome. `TableScreen`/`ActionBar`/`BetSizer`/`CoachNote`/`HandResult` deleted |
+| `src/features/game/LobbyScreen.tsx` + `ModeChoice`, `TableSetupForm`, `StakesSetup`, `SetupField` | configure before you play, with the mode choice as the headline |
+| `src/features/game/SessionSummaryScreen.tsx` + `GradeBreakdown`, `SessionHighlights`, `HighlightCard`, `sessionReport`, `useSessionHands` | the real-mode report and its best/worst replays |
+| `src/components/table/` | `GameBackdrop`, `CardFlip`, `SeatCards`, `HandRankPlate`, `EquityBadge`, `DealerButton` + pure `tableArt`, `seatSlots`, `seatMetrics`, `seatTone`, `boardLayout`, `arenaSlashes`; `TableFelt`/`useSeatGeometry`/`TableSeat`/`SeatPill`/`SeatAvatar`/`TableBet`/`TableCenter`/`WinnerBanner`/`PokerTable` rewritten |
+| `src/components/ui/` | `PlayingCard` redesigned; `CardFace`, `CardBack`, `MysteryCard`, `suitColor` extracted |
+| `src/engine/{session,coach}.ts` | `advanceToLevel` (the wall-clock seam) and `decisionPoints` (the chunked-grading seam) |
+| `src/services/handHistory/` | `currentSessionId()`, `listSessionHands()` for the summary's replay lookup |
+| `src/features/game/avatars.ts`, `assets/avatars/` | the ten character faces, drawn uniquely per session from the seeded RNG |
+
+No new dependencies. `react-native-gesture-handler` was considered for
+swipe-to-dismiss on the advice banner and rejected: it is not a direct
+dependency, it would need a `GestureHandlerRootView` at the root, and a 44pt ✕
+does the same job.
+
+### Decisions worth knowing about
+
+**The table art was already cut out.** `table.PNG` is RGBA with everything
+outside the capsule at alpha 0, so the planned Skia rounded-rect clip was
+unnecessary — a plain `<Image>` composites it straight onto the backdrop.
+Measured once and encoded in `tableArt.ts`: the capsule occupies
+x 0.2432, y 0.1016, w 0.5127, h 0.765 of the 1024×1536 image, aspect 0.4468.
+Skia earns its place on the backdrop only, where a sheared gradient and a dozen
+slashes are five draw calls and nothing a view border can fake. `useImage` was
+avoided deliberately: it returns null on the first frame and would flash an
+empty felt on every mount and every replay step.
+
+**Pacing draws from its own RNG.** Three streams off the session seed: the
+deck's, `botRng`, and a new `paceRng` for think-delays and the avatar draw. A
+delay stealing a number from the bot stream would make an archived hand replay
+differently from the hand that was played. There is a test that plays a paced
+hand and compares its event log to `playUntilSeat` run synchronously on the same
+seed — one stolen draw and they diverge.
+
+**Grading is chunked, and the order is load-bearing.** `reviewDecision` draws
+from the `Rng` it is handed, so a verdict depends on how many decisions were
+graded before it. `decisionPoints` is walked front to back sharing ONE
+`createRng(hand.seed)`, one decision per tick; that is the only way to reproduce
+`reviewHand`, and it is asserted against it. A fresh Rng per tick is a different
+coach, not a chunked one — which is exactly the bug the first version of that
+test had.
+
+**Blinds rise on the clock, between hands.** `SessionConfig.handsPerLevel`
+counts hands, which is the wrong unit for "every three minutes". The store owns
+the clock and states the level through the pure `advanceToLevel`, applied before
+each deal — so the engine keeps its invariants and blinds never change
+mid-hand.
+
+**`shown` counts revealed events, not board cards.** The felt renders
+`hand.events.slice(0, shown)`. `useHandReplay(..., {follow: true})` is
+deliberately *not* used on the live screen: it pins to the newest frame and
+would undo every bit of the pacing. It stays for the tracker and the review.
+
+**The bottom gave back ~60pt, and the table grew ~30%.** The old screen
+reserved ~324pt in-hand and ~390pt between hands (commentary, sizer, action bar,
+coach note, result). Now only the 52pt action row is exclusive; the preset
+column floats over the empty lower-right of the felt. The capsule went from
+roughly 302×467 to 394×608 on a 402pt screen.
+
+**A preselect that stops being legal clears instead of folding.** An armed
+`check` invalidated by someone's raise is cleared, not converted — folding a
+hand the player never chose to fold would be the worst possible surprise.
+`checkFold` in that spot does fold, because that is what it says.
+
+### Traps
+
+**The store no longer deals at import.** `game` is null between sessions, so
+every consumer needs a real empty state; `/game` redirects to `/lobby` when
+there is none. The old screen tests relied on that eager deal.
+
+**`startNextHand` throws** when the session is over or fewer than two players
+can play. The pump gates on that before calling it; the real-mode bust path
+would crash otherwise.
+
+**Jest's `moduleNameMapper` was ordered wrong** — `'^@/(.*)$'` sat before
+`'^@/assets/(.*)$'`, so asset paths resolved into `src/assets/`. Found while
+proving the avatar requires actually bundle (`expo export` lists all ten webp
+files). Metro cannot do dynamic `require`, hence the static ten-entry map.
+
+**A layer must be `position: 'absolute'`, and Jest cannot tell you when it
+isn't.** The rewritten `TableFelt` shipped as a flow child with a real height,
+which pushed every seat — zero-height flow wrappers whose absolute contents
+hang off them — its full 608 points down the screen. Every test passed
+(layout never runs under Jest); the first simulator run showed an empty felt
+with avatars peeking over the bottom bezel. The seat maths was verified pure
+and correct within minutes; the bug was one missing `position: 'absolute'`.
+Simulator smoke-testing after a visual rewrite is not optional here.
+
+**Plates carry the category, the coach keeps the sentence.** "Two pair, kings
+and eights" truncated on every plate the first time a real two-pair hit the
+felt. Shown-down plates now use `categoryName` ("Two pair"), matching the
+reference; the hero's live caption keeps the spoken form ("Pair of fours") and
+trims only a comma'd tail. And the hero's seat is named "You", so the winner
+caption special-cases "You win the hand" — caught on the second simulated
+showdown.
+
+**A showdown gets read, not glimpsed.** Playtesting found the result gone
+before it registered. Two changes, both in `pacing.ts` + `TableSeat`: each
+`showdownHand` reveal now holds 1.1 s (was 0.5), and the finished hand lingers
+`AUTO_NEXT_SHOWDOWN_MS` (8 s) before the next deal when cards were shown —
+fold-ended hands keep the 4 s beat, because there is nothing on the felt to
+study. And a mucked hand is turned face up, dimmed, instead of vanishing:
+real poker lets a loser hide it, but the player learns nothing from a hand
+that disappears, and the reference turns every losing hand over in grey. The
+engine still records the muck; only the presentation declines to honour it.
+
+**`allInBadge` was sampled off the wrong element** and landed blue; the
+reference badge is red (`#E1444E`). Worth remembering that the equity chips and
+the ALL IN badge look similar in a thumbnail and are not the same colour.
+
+### Not done
+
+**No real-device pass yet, and no verified device pass on the navigation.**
+NativeTabs is still `unstable_`; that a push over the tab bar covers it was
+confirmed from the installed expo-router source and a Metro bundle, not on
+hardware. CLAUDE.md PR rule 3 applies before this merges.
+
+**Equity badges do not show mid-run-out yet.** The engine only emits
+`showdownHand` at the river — `closeStreet` runs the board out and then
+finishes — so the badge window is currently the showdown reveal, where the
+percentages are the exact result. `useRunoutEquity` is written and tested
+against the incomplete-board case; the reference's 28% / 41% / 30% appears the
+moment all-in hands are revealed earlier, with no change to the hook.
+
+**No icon library.** `expo-symbols` is not a dependency, so the chevron,
+stopwatch and review button are text glyphs.
+
+---
+
 ## 2026-07-29 — Table redesign: the capsule felt, seats with faces, and a real showdown
 
 The table screen now looks like a poker app instead of a wireframe, modeled on

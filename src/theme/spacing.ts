@@ -11,6 +11,7 @@ export const spacing = {
 
 /** Continuous corner radii. */
 export const radius = {
+  xs: 4,
   sm: 10,
   md: 14,
   lg: 20,

@@ -1,25 +1,23 @@
 /**
  * Pure selectors over a `TableSnapshot` for the showdown presentation: the
- * banner copy under the board and the set of cards that actually play.
+ * caption under the board, the plate over each seat's name, and the set of cards
+ * that actually play.
  */
 
-import { HandCategory, type Card, type TableSnapshot } from '@/engine';
-
-const CATEGORY_PHRASES: Record<HandCategory, string> = {
-  [HandCategory.HighCard]: 'high card',
-  [HandCategory.Pair]: 'a pair',
-  [HandCategory.TwoPair]: 'two pair',
-  [HandCategory.ThreeOfAKind]: 'three of a kind',
-  [HandCategory.Straight]: 'a straight',
-  [HandCategory.Flush]: 'a flush',
-  [HandCategory.FullHouse]: 'a full house',
-  [HandCategory.FourOfAKind]: 'four of a kind',
-  [HandCategory.StraightFlush]: 'a straight flush',
-};
+import {
+  categoryName,
+  describeMadeHand,
+  type Card,
+  type ReplaySeat,
+  type TableSnapshot,
+} from '@/engine';
 
 /**
- * One line for the banner: "Ava wins with a full house", "Ava wins" on a
- * fold-out, "Ava and Ben split the pot". Null while the hand is live.
+ * The caption on the felt: "Ava wins the hand", "Ava and Ben split the pot".
+ * Null while the hand is live.
+ *
+ * Deliberately says nothing about the cards. The hand a pot was won with belongs
+ * on the winner's own plate, where it sits beside the chips it earned.
  */
 export function winnerSummary(snapshot: TableSnapshot): string | null {
   if (!snapshot.complete) {
@@ -34,12 +32,47 @@ export function winnerSummary(snapshot: TableSnapshot): string | null {
   }
 
   if (winners.length > 1) {
-    return `${winners.map((seat) => seat.id).join(' and ')} split the pot`;
+    return `${names(winners)} split the pot`;
   }
 
-  return first.rank
-    ? `${first.id} wins with ${CATEGORY_PHRASES[first.rank.category]}`
-    : `${first.id} wins`;
+  // The hero's seat is named "You", and "You wins the hand" reads as a bug.
+  return first.id === 'You' ? 'You win the hand' : `${first.id} wins the hand`;
+}
+
+/**
+ * What a seat's made-hand plate says, or null when it should not have one.
+ *
+ * Three cases, and no more: a seat that has turned its cards up shows the hand
+ * it showed down, the hero's own live hand is named while the hand is still
+ * running, and anyone who folded or mucked shows nothing.
+ */
+export function madeHandLabel(
+  seat: ReplaySeat,
+  snapshot: TableSnapshot,
+  hero: boolean,
+): string | null {
+  if (seat.status === 'folded' || seat.status === 'sittingOut' || seat.mucked) {
+    return null;
+  }
+
+  if (seat.shown && seat.rank !== null) {
+    // The category alone, reference-style: "Two pair", not "Two pair, kings and
+    // eights". The long form is the coach's vocabulary and does not fit a plate.
+    return categoryName(seat.rank.category);
+  }
+
+  if (hero && !snapshot.complete && seat.holeCards !== null) {
+    return shortLabel(describeMadeHand(seat.holeCards, snapshot.board));
+  }
+
+  return null;
+}
+
+/** "Two pair, kings and eights" → "Two pair"; "Pair of fours" stays whole. */
+function shortLabel(described: string): string {
+  const comma = described.indexOf(',');
+
+  return comma === -1 ? described : described.slice(0, comma);
 }
 
 /**
@@ -63,4 +96,12 @@ export function winningFive(snapshot: TableSnapshot): ReadonlySet<Card> {
   }
 
   return cards;
+}
+
+/** "Ava", "Ava and Ben", "Ava, Ben and Cass". */
+function names(seats: readonly ReplaySeat[]): string {
+  const ids = seats.map((seat) => seat.id);
+  const last = ids.pop() ?? '';
+
+  return ids.length === 0 ? last : `${ids.join(', ')} and ${last}`;
 }

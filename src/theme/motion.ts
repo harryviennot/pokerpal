@@ -21,6 +21,17 @@ export const springs = {
   pulse: { damping: 14, stiffness: 300, mass: 0.8 },
   /** The winner's gold glow fading in. */
   glow: { damping: 26, stiffness: 160, mass: 1 },
+  /**
+   * A card turning face up. Stiffer and lighter than `deal`: a flip that
+   * overshoots looks like the card bounced off the felt.
+   */
+  flip: { damping: 18, stiffness: 320, mass: 0.9 },
+  /**
+   * A notice arriving over the felt — the coach's verdict, an all-in badge.
+   * Slower and softer, so it announces itself without stealing the eye from a
+   * decision in progress.
+   */
+  notify: { damping: 24, stiffness: 200, mass: 1 },
 } as const satisfies Record<string, SpringPreset>;
 
 export type SpringName = keyof typeof springs;

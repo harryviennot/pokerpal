@@ -2,6 +2,7 @@ import { legalActions } from './betting';
 import { applyAction } from './hand';
 import { createRng, type Rng } from './rng';
 import {
+  advanceToLevel,
   currentBlinds,
   finishHand,
   isSessionOver,
@@ -179,6 +180,60 @@ describe('blind levels', () => {
     const { hand } = startNextHand(session);
 
     expect(hand.blinds).toEqual(LEVELS[1]);
+  });
+});
+
+describe('advanceToLevel', () => {
+  const started = (): SessionState => startSession(config([5000, 5000, 5000]));
+
+  it('posts the new blinds on the next hand dealt', () => {
+    const session = advanceToLevel(started(), 1);
+
+    expect(currentBlinds(session)).toEqual(LEVELS[1]);
+    expect(startNextHand(session).hand.blinds).toEqual(LEVELS[1]);
+  });
+
+  it('clamps to the top of the ladder rather than running off it', () => {
+    const session = advanceToLevel(started(), 99);
+
+    expect(session.level).toBe(LEVELS.length - 1);
+    expect(currentBlinds(session)).toEqual(LEVELS[2]);
+    expect(startNextHand(session).hand.blinds).toEqual(LEVELS[2]);
+  });
+
+  it('never moves backwards, and hands back the same session when there is nothing to do', () => {
+    const raised = advanceToLevel(started(), 2);
+
+    // Identity, not equality: a wall clock calls this on every tick, and an
+    // allocation per tick is a re-render per tick for anything watching.
+    expect(advanceToLevel(raised, 0)).toBe(raised);
+    expect(advanceToLevel(raised, -5)).toBe(raised);
+    expect(advanceToLevel(raised, 2)).toBe(raised);
+    expect(advanceToLevel(raised, Number.NaN)).toBe(raised);
+  });
+
+  it('leaves everything else about the session where it was', () => {
+    const played = playHand(started());
+    const raised = advanceToLevel(played, 1);
+
+    expect(raised.level).toBe(1);
+    expect(raised.handsPlayed).toBe(played.handsPlayed);
+    expect(raised.button).toBe(played.button);
+    expect(raised.over).toBe(played.over);
+    expect(raised.seats).toBe(played.seats);
+    expect(raised.history).toBe(played.history);
+  });
+
+  it('sits on top of a hands-per-level schedule without walking it back down', () => {
+    // The clock has already raised the blinds once; the hand counter picks up
+    // from there on its next boundary instead of resetting to level one.
+    let session = advanceToLevel(startSession(config([5000, 5000, 5000], { handsPerLevel: 2 })), 1);
+
+    session = playHand(session);
+    expect(currentBlinds(session)).toEqual(LEVELS[1]);
+
+    session = playHand(session);
+    expect(currentBlinds(session)).toEqual(LEVELS[2]);
   });
 });
 

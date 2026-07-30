@@ -115,6 +115,14 @@ export interface HandHistoryRepo {
   /** Newest first. */
   listHands(options?: { limit?: number }): Promise<readonly StoredHandSummary[]>;
   getHand(id: number): Promise<StoredHand | null>;
+  /**
+   * One session's hands, oldest first by hand number.
+   *
+   * Ascending, unlike `listHands`: this answers "how did that session go", and
+   * the post-game summary needs the stored row ids to link its best and worst
+   * hand to the replay. An unknown session is empty, not an error.
+   */
+  listSessionHands(sessionId: SessionId): Promise<readonly StoredHandSummary[]>;
   totals(): Promise<HandHistoryTotals>;
   /** Newest first. Sessions that never stored a hand are left out. */
   listSessions(options?: { limit?: number }): Promise<readonly StoredSessionStat[]>;

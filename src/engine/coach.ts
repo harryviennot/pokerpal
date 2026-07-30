@@ -83,6 +83,12 @@ export interface DecisionReview {
   facts: DecisionFacts;
 }
 
+/** One state a seat faced in a played hand, paired with what they did in it. */
+export interface DecisionPoint {
+  state: HandState;
+  action: Action;
+}
+
 export interface CoachOptions {
   /** Monte Carlo samples per decision. Review is not on the hot path; be accurate. */
   iterations?: number;
@@ -202,26 +208,34 @@ export function reviewDecision(
 }
 
 /**
- * Grades every decision a seat made in a hand that has already been played.
+ * Every state a seat faced in a hand that has already been played, paired with
+ * the action they took, in the order they took them.
  *
  * Re-deals from the shuffled deck the hand recorded in its own opening event and
- * replays the actions through the real engine, so the state handed to each grade
- * is exactly the one the player faced. Nothing is reconstructed by hand, and
- * nothing can drift from what actually happened.
+ * replays the actions through the real engine, so each state is exactly the one
+ * the player faced. Nothing is reconstructed by hand, and nothing can drift from
+ * what actually happened.
+ *
+ * **The order is load-bearing.** `reviewDecision` draws from the `Rng` it is
+ * handed, so the verdict for a decision depends on how many decisions were
+ * graded before it. A caller grading these one at a time — the store does, one
+ * per event-loop tick, to keep a 1 500-sample Monte Carlo off the frame budget —
+ * reproduces `reviewHand` exactly by walking this array front to back with one
+ * `Rng` instance, and only that way. Every point is returned, including ones the
+ * coach will decline to grade; `reviewDecision` returning null costs no samples.
  */
-export function reviewHand(
+export function decisionPoints(
   config: TableConfig,
   events: readonly HandEvent[],
   seat: SeatIndex,
-  options: CoachOptions,
-): DecisionReview[] {
+): readonly DecisionPoint[] {
   const opening = events.find((event) => event.type === 'handStart');
 
   if (!opening || opening.type !== 'handStart') {
     return [];
   }
 
-  const reviews: DecisionReview[] = [];
+  const points: DecisionPoint[] = [];
   let state = dealHand(config, opening.deck);
 
   for (const event of events) {
@@ -232,17 +246,31 @@ export function reviewHand(
     const action = toAction(event.action);
 
     if (event.seat === seat) {
-      const review = reviewDecision(state, action, options);
-
-      if (review) {
-        reviews.push(review);
-      }
+      points.push({ state, action });
     }
 
     state = applyAction(state, action);
   }
 
-  return reviews;
+  return points;
+}
+
+/**
+ * Grades every decision a seat made in a hand that has already been played.
+ *
+ * The whole-hand path: walks `decisionPoints` front to back on the one `Rng` in
+ * `options`, which is the order a chunked caller must reproduce to reach the
+ * same verdicts. Points the coach cannot grade are dropped.
+ */
+export function reviewHand(
+  config: TableConfig,
+  events: readonly HandEvent[],
+  seat: SeatIndex,
+  options: CoachOptions,
+): DecisionReview[] {
+  return decisionPoints(config, events, seat)
+    .map((point) => reviewDecision(point.state, point.action, options))
+    .filter((review): review is DecisionReview => review !== null);
 }
 
 /** Everything the coach measures before it judges anything. */

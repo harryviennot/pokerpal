@@ -163,6 +163,38 @@ function describeHandHistoryRepo(name: string, makeRepo: () => HandHistoryRepo):
       expect(await repo.getHand(999)).toBeNull();
     });
 
+    it("lists one session's hands oldest first by hand number", async () => {
+      const first = await repo.createSession({ ...SESSION, startedAt: 100 });
+      const second = await repo.createSession({ ...SESSION, startedAt: 900 });
+
+      // Stored, and played, newest hand number first: ordering by insertion or
+      // by clock would both give [2, 1], and the summary needs [1, 2].
+      await repo.saveHand(hand(first, { handNumber: 2, playedAt: 1_000, heroNet: 40 }));
+      await repo.saveHand(
+        hand(first, {
+          handNumber: 1,
+          playedAt: 2_000,
+          heroNet: -15,
+          reviews: [review(), review({ grade: 'mistake', evLoss: 12 })],
+        }),
+      );
+      await repo.saveHand(hand(second, { handNumber: 1, playedAt: 3_000 }));
+
+      const listed = await repo.listSessionHands(first);
+
+      expect(listed.map((stored) => stored.handNumber)).toEqual([1, 2]);
+      expect(listed.every((stored) => stored.sessionId === first)).toBe(true);
+      expect(listed[0]).toMatchObject({ heroNet: -15, decisionsGraded: 2, evLost: 12 });
+      expect(listed[1]).toMatchObject({ heroNet: 40, decisionsGraded: 1, evLost: 0 });
+    });
+
+    it('has nothing for a session with no hands, or one it has never seen', async () => {
+      const empty = await repo.createSession(SESSION);
+
+      expect(await repo.listSessionHands(empty)).toEqual([]);
+      expect(await repo.listSessionHands(999)).toEqual([]);
+    });
+
     it('adds up the totals', async () => {
       const sessionId = await repo.createSession(SESSION);
 

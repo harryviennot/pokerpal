@@ -7,15 +7,17 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import { ChipStack } from '@/components/ui/ChipStack';
 import { PlayingCard } from '@/components/ui/PlayingCard';
 import { Text } from '@/components/ui/Text';
 import { snapshotPot, type Card, type TableSnapshot } from '@/engine';
 import { useMotionPrefs } from '@/hooks/useMotionPrefs';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing, springs } from '@/theme';
+import { springs } from '@/theme';
 import { formatChips } from '@/utils/format';
 
-import { DealIn } from './DealIn';
+import { BOARD_GAP, boardCardSize } from './boardLayout';
+import { CardFlip } from './CardFlip';
 import { WinnerBanner } from './WinnerBanner';
 import { winnerSummary } from './winnerSummary';
 
@@ -23,50 +25,74 @@ export interface TableCenterProps {
   snapshot: TableSnapshot;
   /** Cards that play at showdown; everything else on the board dims. */
   winningFive: ReadonlySet<Card>;
+  /** Width of the capsule, which decides how big the board's cards can be. */
+  feltWidth: number;
 }
 
-/** The middle of the felt: the pot, the board and the result banner. */
-export function TableCenter({ snapshot, winningFive }: TableCenterProps) {
+/**
+ * Where each row sits on the capsule, as a fraction of its height.
+ *
+ * Measured off the reference rather than spaced evenly: the pot rides high in the
+ * top cap, the collected chips sit above the middle, and the board is a shade
+ * below it, which leaves the bottom third clear for the hero's own cards.
+ */
+const ROWS = { pot: '13.5%', chips: '37.6%', board: '48.4%', caption: '64.2%' } as const;
+
+/** How many face-down cards stand in for the board between hands. */
+const MYSTERY_CARDS = 3;
+
+/** The middle of the felt: the pot, the board and the result caption. */
+export function TableCenter({ snapshot, winningFive, feltWidth }: TableCenterProps) {
   const { colors } = useTheme();
   const pot = snapshotPot(snapshot);
   const summary = winnerSummary(snapshot);
   const tick = usePotTick(pot);
+  const cards = boardCardSize(feltWidth);
+  // Between hands the board is gone but the felt should not read as empty; the
+  // reference stands three unrevealed cards in its place.
+  const waiting = snapshot.complete && snapshot.board.length === 0;
 
   return (
-    <View style={styles.middle} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <View
         accessibilityRole="text"
         accessibilityLabel={`Pot ${formatChips(pot)}`}
-        style={[styles.pot, { backgroundColor: colors.feltOverlay }]}>
-        <Text variant="caption" style={[styles.potLabel, { color: colors.onFelt }]}>
+        style={[styles.row, { top: ROWS.pot }]}>
+        <Text variant="footnote" style={{ color: colors.onFelt }}>
           Pot total
         </Text>
         <Animated.View style={tick}>
-          <Text variant="headline" tabular style={{ color: colors.onFelt }}>
+          <Text variant="headline" tabular style={[styles.amount, { color: colors.onFelt }]}>
             {formatChips(pot)}
           </Text>
         </Animated.View>
       </View>
 
-      <View style={styles.board}>
-        {snapshot.board.map((card) => (
-          <DealIn key={card}>
-            <PlayingCard
-              card={card}
-              size="medium"
-              dimmed={winningFive.size > 0 && !winningFive.has(card)}
-            />
-          </DealIn>
-        ))}
-      </View>
-
-      {snapshot.board.length === 0 && summary === null && (
-        <Text variant="footnote" style={[styles.waiting, { color: colors.onFelt }]}>
-          Preflop
-        </Text>
+      {snapshot.pot > 0 && (
+        <View style={[styles.row, { top: ROWS.chips }]}>
+          <ChipStack amount={snapshot.pot} size="medium" label="Pot" />
+        </View>
       )}
 
-      <WinnerBanner summary={summary} />
+      <View style={[styles.row, styles.board, { top: ROWS.board }]}>
+        {waiting
+          ? Array.from({ length: MYSTERY_CARDS }, (_, index) => (
+              <PlayingCard key={index} size={cards} mystery />
+            ))
+          : snapshot.board.map((card, index) => (
+              <CardFlip key={card} index={index}>
+                <PlayingCard
+                  card={card}
+                  size={cards}
+                  dimmed={winningFive.size > 0 && !winningFive.has(card)}
+                />
+              </CardFlip>
+            ))}
+      </View>
+
+      <View style={[styles.row, { top: ROWS.caption }]}>
+        <WinnerBanner summary={summary} />
+      </View>
     </View>
   );
 }
@@ -86,27 +112,20 @@ function usePotTick(pot: number) {
 }
 
 const styles = StyleSheet.create({
-  middle: {
+  // Each row is pinned by its own top edge and centres itself across the felt,
+  // so nothing above it can shift anything below.
+  row: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    gap: spacing.md,
   },
-  pot: {
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    gap: 2,
-  },
-  potLabel: {
-    opacity: 0.7,
-    letterSpacing: 0.4,
+  amount: {
+    fontWeight: '800',
   },
   board: {
     flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  waiting: {
-    opacity: 0.5,
-    letterSpacing: 0.4,
+    justifyContent: 'center',
+    gap: BOARD_GAP,
   },
 });

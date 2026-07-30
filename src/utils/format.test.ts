@@ -1,4 +1,12 @@
-import { formatChips, formatPercent, formatRatio, formatWhen, THIN_SPACE } from './format';
+import {
+  formatChips,
+  formatClock,
+  formatPercent,
+  formatPercentWhole,
+  formatRatio,
+  formatWhen,
+  THIN_SPACE,
+} from './format';
 
 describe('formatPercent', () => {
   it('renders a probability with one decimal', () => {
@@ -35,6 +43,42 @@ describe('formatChips', () => {
 
   it('rounds fractional chips', () => {
     expect(formatChips(1499.6)).toBe(`1${THIN_SPACE}500`);
+  });
+});
+
+describe('formatPercentWhole', () => {
+  it('renders a probability as a whole percentage', () => {
+    expect(formatPercentWhole(0.284)).toBe('28%');
+    expect(formatPercentWhole(0.415)).toBe('42%');
+    expect(formatPercentWhole(0)).toBe('0%');
+    expect(formatPercentWhole(1)).toBe('100%');
+  });
+
+  it('clamps values outside 0 to 1', () => {
+    expect(formatPercentWhole(-0.5)).toBe('0%');
+    expect(formatPercentWhole(1.5)).toBe('100%');
+  });
+});
+
+describe('formatClock', () => {
+  it('renders minutes and a zero-padded second', () => {
+    expect(formatClock(47_000)).toBe('0:47');
+    expect(formatClock(55_400)).toBe('0:55');
+    expect(formatClock(9_514_000)).toBe('158:34');
+  });
+
+  it('counts minutes past an hour rather than rolling over', () => {
+    expect(formatClock(3_600_000)).toBe('60:00');
+  });
+
+  it('truncates the part-second rather than rounding it up', () => {
+    // A clock that showed 1:00 with a second still to run would be lying.
+    expect(formatClock(59_999)).toBe('0:59');
+  });
+
+  it('never runs backwards', () => {
+    expect(formatClock(-5_000)).toBe('0:00');
+    expect(formatClock(Number.NaN)).toBe('0:00');
   });
 });
 

@@ -1,62 +1,130 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ImageSourcePropType } from 'react-native';
 
-import { describeMadeHand, type ReplaySeat, type SeatIndex, type TableSnapshot } from '@/engine';
+import { type SeatIndex, type TableSnapshot } from '@/engine';
+import { spacing } from '@/theme';
 
+import { DealerButton } from './DealerButton';
+import { GameBackdrop } from './GameBackdrop';
+import { SeatAvatar } from './SeatAvatar';
+import { capsuleRect } from './tableArt';
 import { TableBet } from './TableBet';
 import { TableCenter } from './TableCenter';
 import { TableFelt } from './TableFelt';
 import { TableSeat } from './TableSeat';
-import { betSpot, seatSpot, useSeatGeometry } from './useSeatGeometry';
-import { winningFive } from './winnerSummary';
+import {
+  betSpot,
+  buttonSpot,
+  seatBox,
+  seatSide,
+  seatSpot,
+  useSeatGeometry,
+} from './useSeatGeometry';
+import { madeHandLabel, winningFive } from './winnerSummary';
 
 export interface PokerTableProps {
   snapshot: TableSnapshot;
   /** The seat drawn at the bottom, with its cards face up. */
   heroSeat: SeatIndex;
+  /** Character portraits by seat index. Seats without one show a coloured initial. */
+  seatAvatars?: readonly ImageSourcePropType[];
+  /** A frosted badge over each seat's cards by seat index — live equity, say. */
+  seatBadges?: readonly (string | null)[];
+  /** The verb the acting seat just played, from the frame being shown. */
+  actionLabel?: string | null;
+  /** Paints the arena field behind the felt. Off when the screen paints its own. */
+  backdrop?: boolean;
 }
 
 /**
- * The felt: seats around a racetrack, the board and the pot in the middle.
+ * Clearance between the edge of the component and the table.
  *
- * The one custom canvas in the app, and the only screen that positions
- * anything by hand. Geometry comes from the measured size rather than fixed
- * points so a two-handed table and a nine-handed one lay out from one rule.
+ * Small on purpose: the reference runs the capsule almost to the bezel, and the
+ * screens that host this already pad their own edges.
  */
-export function PokerTable({ snapshot, heroSeat }: PokerTableProps) {
+const MARGIN = spacing.xs;
+
+/**
+ * The felt: seats around a capsule, the board and the pot in the middle.
+ *
+ * The one custom canvas in the app, and the only screen that positions anything
+ * by hand. Everything is placed against the capsule's own rect rather than the
+ * component's, so a phone-sized table and the tracker's smaller one lay out from
+ * one set of fractions — see `seatSlots`.
+ *
+ * Driven entirely by a `TableSnapshot`: everything richer than that, portraits
+ * and equity badges and the acting player's verb, arrives as an optional prop, so
+ * a caller with only a replay log gets the same table with fewer decorations.
+ */
+export function PokerTable({
+  snapshot,
+  heroSeat,
+  seatAvatars,
+  seatBadges,
+  actionLabel = null,
+  backdrop = true,
+}: PokerTableProps) {
   const { size, measured, onLayout } = useSeatGeometry();
+  const capsule = capsuleRect(size, MARGIN);
+  const felt = { width: capsule.width, height: capsule.height };
   const winning = winningFive(snapshot);
   const count = snapshot.seats.length;
+  const hero = snapshot.seats[heroSeat];
 
   return (
     <View style={styles.container} onLayout={onLayout}>
-      <TableFelt width={size.width} height={size.height} />
+      {backdrop && <GameBackdrop />}
 
-      <TableCenter snapshot={snapshot} winningFive={winning} />
+      {/* Seats are always in the tree — hiding them until the first layout pass
+          would keep them out of the accessibility tree too — but they only
+          become visible once there is a table to place them on. */}
+      <View style={[styles.absolute, capsule, !measured && styles.unmeasured]}>
+        <TableFelt width={felt.width} height={felt.height} />
 
-      {/* Seats are always in the tree — hiding them until the first layout
-          pass would keep them out of the accessibility tree too — but they
-          only become visible once there is a table to place them on. */}
-      <View style={[styles.seats, !measured && styles.unmeasured]}>
+        {/* Over the felt but under every plate, leaning off the rail and cropped
+            by the edge of the screen, the way the reference frames it. */}
+        {hero && seatAvatars?.[heroSeat] !== undefined && (
+          <View style={styles.portrait} pointerEvents="none">
+            <SeatAvatar hero name={hero.id} source={seatAvatars[heroSeat]} />
+          </View>
+        )}
+
+        <TableCenter snapshot={snapshot} winningFive={winning} feltWidth={felt.width} />
+
         {snapshot.seats.map((seat) => {
-          const hero = seat.seat === heroSeat;
-          const spot = seatSpot(seat.seat, heroSeat, count, size);
-          const bet = betSpot(spot, size);
+          // A busted player leaves their chair empty rather than closing the
+          // gap: nobody else moves when someone goes broke.
+          if (seat.status === 'sittingOut') {
+            return null;
+          }
+
+          const isHero = seat.seat === heroSeat;
+          const spot = seatSpot(seat.seat, heroSeat, count, felt);
+          const bet = betSpot(seat.seat, heroSeat, count, felt);
+          const button = buttonSpot(seat.seat, heroSeat, count, felt);
 
           return (
             <View key={seat.seat}>
-              <View style={[styles.absolute, { left: spot.x, top: spot.y }]}>
+              <View style={[styles.absolute, spotStyle(spot), seatBox(isHero)]}>
                 <TableSeat
                   seat={seat}
-                  onButton={seat.seat === snapshot.button}
                   active={seat.seat === snapshot.actor}
-                  revealed={hero}
+                  revealed={isHero}
                   winningFive={winning}
-                  handLabel={hero ? heroHandLabel(seat, snapshot) : null}
+                  handLabel={madeHandLabel(seat, snapshot, isHero)}
+                  actionLabel={seat.seat === snapshot.actor ? actionLabel : null}
+                  avatar={seatAvatars?.[seat.seat]}
+                  badge={seatBadges?.[seat.seat] ?? null}
+                  side={seatSide(seat.seat, heroSeat, count)}
                 />
               </View>
-              <View style={[styles.absolute, { left: bet.x, top: bet.y }]}>
-                <TableBet amount={seat.bet} />
+              <View style={[styles.absolute, spotStyle(bet)]}>
+                <TableBet amount={seat.bet} allIn={seat.status === 'allIn'} />
               </View>
+              {seat.seat === snapshot.button && (
+                <View style={[styles.absolute, spotStyle(button)]}>
+                  <DealerButton />
+                </View>
+              )}
             </View>
           );
         })}
@@ -65,32 +133,24 @@ export function PokerTable({ snapshot, heroSeat }: PokerTableProps) {
   );
 }
 
-/** The hero's live made hand; nothing once the hand is over or the hero is out. */
-function heroHandLabel(seat: ReplaySeat, snapshot: TableSnapshot): string | null {
-  if (snapshot.complete || seat.holeCards === null) {
-    return null;
-  }
-
-  if (seat.status === 'folded' || seat.status === 'sittingOut') {
-    return null;
-  }
-
-  return describeMadeHand(seat.holeCards, snapshot.board);
+function spotStyle(spot: { x: number; y: number }) {
+  return { left: spot.x, top: spot.y };
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  seats: {
+  absolute: {
     position: 'absolute',
-    inset: 0,
   },
   unmeasured: {
     opacity: 0,
   },
-  absolute: {
+  portrait: {
     position: 'absolute',
+    left: -spacing.xxl,
+    bottom: 0,
   },
 });

@@ -1,52 +1,59 @@
-import { StyleSheet, View } from 'react-native';
-import Animated, { ReduceMotion, ZoomIn } from 'react-native-reanimated';
+import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, springs } from '@/theme';
+import { radius } from '@/theme';
 
-export const AVATAR_SIZE = 34;
+/** Diameter of the initial circle, which is what a caller with no artwork gets. */
+const AVATAR_SIZE = 34;
+
+/** The character bust beside an opponent's plate. */
+const BUST = { width: 54, height: 76 };
+
+/** The player's own portrait, which the reference plants in the bottom corner. */
+const HERO_BUST = { width: 152, height: 210 };
 
 export interface SeatAvatarProps {
-  /** The display name; the circle shows its first letter. */
+  /** The display name; the fallback circle shows its first letter. */
   name: string;
-  /** Draws the crown badge on a seat that just won the pot. */
-  crowned?: boolean;
+  /** The character portrait. Without one the seat falls back to the circle. */
+  source?: ImageSourcePropType;
+  /** Draws the player's own, much larger portrait. Needs a `source`. */
+  hero?: boolean;
 }
 
-const crownIn = ZoomIn.springify()
-  .damping(springs.glow.damping)
-  .stiffness(springs.glow.stiffness)
-  .mass(springs.glow.mass)
-  .reduceMotion(ReduceMotion.System);
-
-/** A player's initial in a circle, with a crown when they take the pot. */
-export function SeatAvatar({ name, crowned = false }: SeatAvatarProps) {
+/**
+ * The face at a seat: a character bust where the caller has artwork, and a
+ * coloured initial where it does not.
+ *
+ * The fallback is not a placeholder to be replaced — the tracker replays stored
+ * hands whose players were never given a portrait, and an initial in a circle is
+ * the right answer there.
+ */
+export function SeatAvatar({ name, source, hero = false }: SeatAvatarProps) {
   const { colors } = useTheme();
 
-  return (
-    <View style={styles.wrapper}>
+  if (source === undefined) {
+    return hero ? null : (
       <View style={[styles.circle, { backgroundColor: colors.avatar }]}>
         <Text variant="footnote" style={[styles.initial, { color: colors.onSeatPill }]}>
           {name.slice(0, 1).toUpperCase()}
         </Text>
       </View>
-      {crowned && (
-        <Animated.View entering={crownIn} style={styles.crown}>
-          <Text accessibilityLabel="Winner" variant="footnote" style={{ color: colors.winner }}>
-            ♛
-          </Text>
-        </Animated.View>
-      )}
-    </View>
+    );
+  }
+
+  return (
+    <Image
+      accessibilityIgnoresInvertColors
+      source={source}
+      resizeMode="contain"
+      style={hero ? HERO_BUST : BUST}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-  },
   circle: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -56,10 +63,5 @@ const styles = StyleSheet.create({
   },
   initial: {
     fontWeight: '700',
-  },
-  crown: {
-    position: 'absolute',
-    top: -12,
-    alignSelf: 'center',
   },
 });

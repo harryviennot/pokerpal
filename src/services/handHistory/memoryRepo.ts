@@ -106,6 +106,15 @@ export function createMemoryHandHistoryRepo(): HandHistoryRepo {
       });
     },
 
+    listSessionHands(sessionId) {
+      return Promise.resolve(
+        hands
+          .filter((stored) => stored.sessionId === sessionId)
+          .sort((a, b) => a.handNumber - b.handNumber)
+          .map(summarize),
+      );
+    },
+
     listSessions(options) {
       const stats: StoredSessionStat[] = [];
 

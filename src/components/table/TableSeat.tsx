@@ -1,92 +1,90 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ImageSourcePropType } from 'react-native';
 
-import { PlayingCard } from '@/components/ui/PlayingCard';
-import { Text } from '@/components/ui/Text';
 import { type Card, type ReplaySeat } from '@/engine';
-import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/theme';
+import { spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
 
-import { DealIn } from './DealIn';
+import { HandRankPlate } from './HandRankPlate';
 import { SeatAvatar } from './SeatAvatar';
+import { SeatCards } from './SeatCards';
+import { CARD_PEEK, HERO_SEAT_WIDTH, SEAT_WIDTH } from './seatMetrics';
 import { SeatPill } from './SeatPill';
-
-export const SEAT_WIDTH = 96;
-export const SEAT_HEIGHT = 96;
 
 export interface TableSeatProps {
   seat: ReplaySeat;
-  onButton: boolean;
-  /** The seat this frame's event belongs to. Inverts the pill. */
+  /** The seat this frame's event belongs to. Whitens the plate. */
   active: boolean;
   /** Whether the hole cards are face up. Shown hands are always face up. */
   revealed: boolean;
   /** Cards that play at showdown; face-up cards outside it dim. */
   winningFive: ReadonlySet<Card>;
-  /** The hero's live made hand, shown as a caption over the pill. */
+  /** The made hand, shown on a plate behind the name. */
   handLabel?: string | null;
+  /** The verb this seat just played, shown in place of its name. */
+  actionLabel?: string | null;
+  /** The character portrait. Without one the seat shows a coloured initial. */
+  avatar?: ImageSourcePropType;
+  /** Frosted badge over the cards — live equity during an all-in run-out. */
+  badge?: string | null;
+  /** Which edge of the capsule this seat sits against; puts the face outboard. */
+  side?: 'left' | 'right';
 }
 
 /**
- * One player around the table: avatar and cards peeking over the name pill.
+ * One player around the table: a face and a hand tucked behind a name plate.
  *
- * The hero's seat drops the avatar and fans its two cards large and face up,
- * the way the player would hold them; everyone else shows small backs.
+ * The portrait always sits on the outboard side, so nothing ever covers the
+ * middle of the felt. The hero's seat drops the portrait — it has one of its own,
+ * far larger, in the corner of the screen — and holds its two cards full size
+ * and face up, the way the player would.
  */
 export function TableSeat({
   seat,
-  onButton,
   active,
   revealed,
   winningFive,
   handLabel = null,
+  actionLabel = null,
+  avatar,
+  badge = null,
+  side = 'left',
 }: TableSeatProps) {
-  const { colors } = useTheme();
   const out = seat.status === 'folded' || seat.status === 'sittingOut';
-  const faceUp = revealed || seat.shown;
-  // A seat that folded or mucked has no cards in front of it any more.
-  const holeCards = out || seat.mucked ? null : seat.holeCards;
-  const dims = (card: Card): boolean => faceUp && winningFive.size > 0 && !winningFive.has(card);
+  // A mucked hand is shown anyway, face up and dimmed. Real poker lets a loser
+  // hide it, but the player learns nothing from a hand that vanishes — and the
+  // reference design turns every losing hand over in grey.
+  const faceUp = revealed || seat.shown || seat.mucked;
+  // A seat that folded has no cards in front of it any more.
+  const cards = out ? null : seat.holeCards;
+  const width = revealed ? HERO_SEAT_WIDTH : SEAT_WIDTH;
+  // An opponent who shows down brings their hand out from behind the plate and
+  // sets it down inboard, where it can actually be read.
+  const beside = faceUp && !revealed && cards !== null;
+
+  const hand = (
+    <SeatCards
+      cards={cards}
+      faceUp={faceUp}
+      hero={revealed}
+      winningFive={winningFive}
+      badge={badge}
+    />
+  );
 
   return (
-    <View style={[styles.wrapper, out && styles.out]} accessibilityLabel={label(seat)}>
-      <View style={styles.peek}>
-        {!revealed && <SeatAvatar name={seat.id} crowned={seat.won > 0} />}
-        {holeCards ? (
-          holeCards.map((card, index) => (
-            <View key={card} style={cardStyle(revealed, index)}>
-              <DealIn variant="scale">
-                <PlayingCard
-                  size={revealed ? 'large' : 'small'}
-                  card={faceUp ? card : undefined}
-                  faceDown={!faceUp}
-                  dimmed={dims(card)}
-                />
-              </DealIn>
-            </View>
-          ))
-        ) : (
-          <View style={styles.cardSpacer} />
-        )}
+    <View style={styles.seat} accessibilityLabel={label(seat)}>
+      <View style={[styles.peek, side === 'right' && styles.mirrored]}>
+        {!revealed && <SeatAvatar name={seat.id} source={avatar} />}
+        {beside ? <View style={styles.gap} /> : hand}
       </View>
 
-      {handLabel !== null && (
-        <View style={[styles.handLabel, { backgroundColor: colors.feltOverlay }]}>
-          <Text variant="caption" numberOfLines={1} style={{ color: colors.onFelt }}>
-            {handLabel}
-          </Text>
-        </View>
-      )}
+      {handLabel !== null && <HandRankPlate label={handLabel} width={width} />}
 
-      <SeatPill seat={seat} active={active} />
+      <SeatPill seat={seat} active={active} hero={revealed} actionLabel={actionLabel} />
 
-      {onButton && (
-        <View
-          accessibilityLabel="Dealer button"
-          style={[styles.button, { backgroundColor: colors.chip }]}>
-          <Text variant="caption" style={[styles.buttonLabel, { color: colors.suitBlack }]}>
-            D
-          </Text>
+      {beside && (
+        <View style={[styles.beside, side === 'left' ? styles.inboardRight : styles.inboardLeft]}>
+          {hand}
         </View>
       )}
     </View>
@@ -101,65 +99,43 @@ function label(seat: ReplaySeat): string {
   return `${seat.id}, ${formatChips(seat.stack)} behind`;
 }
 
-/** The hero's cards fan apart; an opponent's backs just overlap. */
-function cardStyle(revealed: boolean, index: number) {
-  if (revealed) {
-    return index === 0 ? styles.heroCard : styles.heroSecond;
-  }
-
-  return index === 1 ? styles.backSecond : undefined;
-}
-
 const styles = StyleSheet.create({
-  wrapper: {
-    width: SEAT_WIDTH,
-    height: SEAT_HEIGHT,
+  seat: {
     alignItems: 'center',
     justifyContent: 'flex-end',
+    // Cards and portrait rise above the box the geometry hands out; the plate is
+    // what the geometry actually places.
+    flex: 1,
   },
-  out: {
-    opacity: 0.4,
-  },
-  // Avatar and cards sit behind the pill, peeking over its top edge.
+  // The face and the hand overlap the plate's top edge, and the plate is drawn
+  // over them.
   peek: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: spacing.xs,
-    marginBottom: -spacing.md,
+    minHeight: CARD_PEEK,
+    marginBottom: -spacing.base,
     zIndex: 0,
   },
-  backSecond: {
-    marginLeft: -spacing.sm,
+  mirrored: {
+    flexDirection: 'row-reverse',
   },
-  heroCard: {
-    transform: [{ rotate: '-4deg' }],
+  // Holds the row open when the hand has moved out beside the plate, so the
+  // plate does not jump up the felt at showdown.
+  gap: {
+    height: CARD_PEEK,
   },
-  heroSecond: {
-    marginLeft: -spacing.base,
-    transform: [{ rotate: '5deg' }],
-  },
-  cardSpacer: {
-    height: 42,
-  },
-  handLabel: {
-    maxWidth: SEAT_WIDTH * 1.5,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: radius.full,
-    marginBottom: spacing.xs / 2,
-    zIndex: 1,
-  },
-  button: {
+  // Level with the plate and just past its edge, overflowing the box the geometry
+  // handed out — there is felt there, and nothing else wants it.
+  beside: {
     position: 'absolute',
-    right: -2,
-    bottom: 0,
-    width: 18,
-    height: 18,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    bottom: -spacing.xs,
   },
-  buttonLabel: {
-    fontWeight: '700',
+  inboardRight: {
+    left: '100%',
+    marginLeft: spacing.xs,
+  },
+  inboardLeft: {
+    right: '100%',
+    marginRight: spacing.xs,
   },
 });

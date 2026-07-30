@@ -1,11 +1,13 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
-import { Text } from '@/components/ui/Text';
-import { formatRank, isRedSuit, rankOf, suitOf, suitSymbol, type Card } from '@/engine';
+import { CardBack } from '@/components/ui/CardBack';
+import { CardFace } from '@/components/ui/CardFace';
+import { MysteryCard } from '@/components/ui/MysteryCard';
+import { formatRank, rankOf, suitOf, type Card } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/theme';
+import { radius } from '@/theme';
 
-export type PlayingCardSize = 'small' | 'medium' | 'large';
+export type PlayingCardSize = 'small' | 'medium' | 'large' | 'xl';
 
 export interface PlayingCardProps {
   /** Omit for an empty slot, or when the card is face down. */
@@ -17,24 +19,36 @@ export interface PlayingCardProps {
   faceDown?: boolean;
   /** Greys the card out — one that is not part of the winning five at showdown. */
   dimmed?: boolean;
+  /** The dark "?" placeholder shown between hands, before the board exists. */
+  mystery?: boolean;
   onPress?: () => void;
   accessibilityLabel?: string;
 }
 
+/**
+ * Card sizes, in points.
+ *
+ * `large` is the board and the odds calculator's hero slots; `xl` is the two
+ * cards the player is actually holding, which the reference draws a shade bigger
+ * than the board's.
+ */
 const DIMENSIONS: Record<PlayingCardSize, { width: number; height: number }> = {
   small: { width: 30, height: 42 },
   medium: { width: 44, height: 62 },
   large: { width: 60, height: 84 },
+  xl: { width: 62, height: 88 },
 };
 
-const RANK_VARIANT = { small: 'footnote', medium: 'title3', large: 'title1' } as const;
-const SUIT_VARIANT = { small: 'footnote', medium: 'title3', large: 'title2' } as const;
+/** How big a card of `size` is, for callers that have to lay a row of them out. */
+export function cardSize(size: PlayingCardSize): { width: number; height: number } {
+  return DIMENSIONS[size];
+}
 
 /**
- * A single card: face up, face down, or a dashed placeholder when empty.
+ * A single card: face up, face down, unrevealed, or a dashed placeholder.
  *
- * The face is the two-index design from the table art: the rank in the top
- * left corner and one large suit pip in the bottom right, nothing else.
+ * Owns the frame, the state and what a screen reader is told; `CardFace`,
+ * `CardBack` and `MysteryCard` own what fills it.
  */
 export function PlayingCard({
   card,
@@ -42,55 +56,49 @@ export function PlayingCard({
   focused = false,
   faceDown = false,
   dimmed = false,
+  mystery = false,
   onPress,
   accessibilityLabel,
 }: PlayingCardProps) {
   const { colors } = useTheme();
   const { width, height } = DIMENSIONS[size];
-  const isEmpty = card === undefined && !faceDown;
-  const face = dimmed ? colors.cardFaceDimmed : colors.cardFace;
-  const glyph = {
-    color: suitColor(card, colors.suitRed, colors.suitBlack),
-    opacity: dimmed ? 0.55 : 1,
-  };
+  const covered = faceDown || mystery;
+  const isEmpty = card === undefined && !covered;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? describe(card, faceDown, dimmed)}
+      accessibilityLabel={accessibilityLabel ?? describe(card, covered, dimmed, mystery)}
       accessibilityState={{ selected: focused }}
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [
         styles.base,
-        { width, height, borderRadius: radius.sm },
+        { width, height, borderRadius: radius.xs },
         isEmpty && { borderWidth: 2, borderStyle: 'dashed', borderColor: colors.separator },
-        !isEmpty && { backgroundColor: faceDown ? colors.cardBack : face },
+        !isEmpty &&
+          !covered && { backgroundColor: dimmed ? colors.cardFaceDimmed : colors.cardFace },
         focused && { borderWidth: 2, borderStyle: 'solid', borderColor: colors.tint },
         pressed && styles.pressed,
       ]}>
-      {faceDown && (
-        <>
-          <View style={[styles.backBorder, { borderColor: colors.cardBackAccent }]} />
-          <View style={[styles.backLozenge, { backgroundColor: colors.cardBackAccent }]} />
-        </>
-      )}
-      {card !== undefined && !faceDown && (
-        <>
-          <Text variant={RANK_VARIANT[size]} style={[styles.rank, glyph]}>
-            {formatRank(rankOf(card))}
-          </Text>
-          <Text variant={SUIT_VARIANT[size]} style={[styles.suit, glyph]}>
-            {suitSymbol(suitOf(card))}
-          </Text>
-        </>
-      )}
+      {mystery && <MysteryCard radius={radius.sm} large={size === 'large' || size === 'xl'} />}
+      {faceDown && !mystery && <CardBack radius={radius.sm} />}
+      {card !== undefined && !covered && <CardFace card={card} size={size} dimmed={dimmed} />}
     </Pressable>
   );
 }
 
-function describe(card: Card | undefined, faceDown: boolean, dimmed: boolean): string {
-  if (faceDown) {
+function describe(
+  card: Card | undefined,
+  covered: boolean,
+  dimmed: boolean,
+  mystery: boolean,
+): string {
+  if (mystery) {
+    return 'Card not dealt yet';
+  }
+
+  if (covered) {
     return 'Face-down card';
   }
 
@@ -105,10 +113,6 @@ function describe(card: Card | undefined, faceDown: boolean, dimmed: boolean): s
   return dimmed ? `${name}, does not play` : name;
 }
 
-function suitColor(card: Card | undefined, red: string, black: string): string {
-  return card !== undefined && isRedSuit(suitOf(card)) ? red : black;
-}
-
 function suitName(card: Card): string {
   const names = { c: 'clubs', d: 'diamonds', h: 'hearts', s: 'spades' } as const;
 
@@ -118,38 +122,6 @@ function suitName(card: Card): string {
 const styles = StyleSheet.create({
   base: {
     overflow: 'hidden',
-  },
-  rank: {
-    position: 'absolute',
-    top: spacing.xs / 2,
-    left: spacing.xs,
-    fontWeight: '700',
-  },
-  suit: {
-    position: 'absolute',
-    bottom: spacing.xs / 2,
-    right: spacing.xs,
-  },
-  // The back: an inset border and a small lozenge, legible at every size
-  // without becoming artwork that competes with the faces beside it.
-  backBorder: {
-    position: 'absolute',
-    inset: 3,
-    borderWidth: 1.5,
-    borderRadius: radius.sm - 3,
-    opacity: 0.9,
-  },
-  backLozenge: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 10,
-    height: 10,
-    marginTop: -5,
-    marginLeft: -5,
-    borderRadius: radius.sm / 4,
-    transform: [{ rotate: '45deg' }],
-    opacity: 0.9,
   },
   pressed: {
     opacity: 0.6,

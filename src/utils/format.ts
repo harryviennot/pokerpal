@@ -21,9 +21,37 @@ export function formatChips(chips: number): string {
   return `${sign}${grouped}`;
 }
 
+/**
+ * Formats a 0-to-1 probability as a whole percentage: `0.284` becomes `28%`.
+ *
+ * For a figure that is glanced at rather than read — the badge printed on a hand
+ * during a run-out, where a decimal place is noise and does not fit. Anywhere a
+ * number is being compared, use `formatPercent` and keep the decimal.
+ */
+export function formatPercentWhole(value: number): string {
+  const clamped = Math.min(1, Math.max(0, value));
+
+  return `${Math.round(clamped * 100)}%`;
+}
+
 /** Formats a multiplier such as a stack-to-pot ratio: 2.5 becomes `2.5x`. */
 export function formatRatio(ratio: number): string {
   return `${ratio.toFixed(1)}x`;
+}
+
+/**
+ * Formats a duration as `m:ss`, the way a tournament clock reads.
+ *
+ * Minutes are unpadded and unbounded, so a three-hour session shows `180:00`
+ * rather than rolling over into hours nobody is counting. A negative or
+ * non-finite duration reads as `0:00`: a clock on screen never runs backwards.
+ *
+ * @param ms milliseconds.
+ */
+export function formatClock(ms: number): string {
+  const seconds = Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 1_000)) : 0;
+
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

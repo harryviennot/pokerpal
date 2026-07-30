@@ -81,6 +81,21 @@ export class HandArchiver {
     return this.tail;
   }
 
+  /**
+   * The session row this archiver's hands are attached to, or null when there
+   * is not one yet.
+   *
+   * Answers the question, it does not force it: the row appears on the first
+   * hand's write, and a summary screen asking which session to read must not be
+   * the thing that conjures an empty one. Callers wanting the id for hands they
+   * have just recorded await `idle()` first. A session insert that failed also
+   * reads as null — the failure already reached the feature boundary through
+   * `onStatus`, and it must not surface a second time as a rejected promise.
+   */
+  currentSessionId(): Promise<SessionId | null> {
+    return this.sessionId?.catch(() => null) ?? Promise.resolve(null);
+  }
+
   private session(repo: HandHistoryRepo): Promise<SessionId> {
     // A failed session insert clears the memo so the next hand retries it —
     // one transient failure must not strand the whole session's history.

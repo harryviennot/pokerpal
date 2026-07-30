@@ -2,10 +2,10 @@ import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { suitColor } from '@/components/ui/suitColor';
 import { Text } from '@/components/ui/Text';
 import {
   formatRank,
-  isRedSuit,
   makeCard,
   RANKS,
   SUITS,
@@ -108,11 +108,7 @@ export function CardPicker({ used, onPick }: CardPickerProps) {
               <Text
                 variant="title3"
                 style={{
-                  color: disabled
-                    ? colors.tertiaryLabel
-                    : isRedSuit(suit)
-                      ? colors.suitRed
-                      : colors.suitBlack,
+                  color: disabled ? colors.tertiaryLabel : suitColor(suit, colors),
                 }}>
                 {suitSymbol(suit)}
               </Text>
