@@ -89,6 +89,9 @@ export function PokerTable({
   const winning = winningFive(snapshot);
   const count = snapshot.seats.length;
   const hero = snapshot.seats[heroSeat];
+  // Hands on the table or a finished hand: no turn is coming for anyone, so
+  // the hero's fan has no reason to sit tucked.
+  const showdown = snapshot.complete || snapshot.seats.some((seat) => seat.shown || seat.mucked);
 
   return (
     <View style={styles.container} onLayout={onLayout}>
@@ -134,6 +137,7 @@ export function PokerTable({
                   actionLabel={seat.seat === snapshot.actor ? actionLabel : null}
                   avatar={seatAvatars?.[seat.seat]}
                   badge={seatBadges?.[seat.seat] ?? null}
+                  showdown={showdown}
                   side={seatSide(seat.seat, heroSeat, count)}
                 />
               </View>

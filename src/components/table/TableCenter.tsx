@@ -16,7 +16,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { springs } from '@/theme';
 import { formatChips } from '@/utils/format';
 
-import { BOARD_GAP, boardCardSize } from './boardLayout';
+import { BOARD_GAP, boardCardSize, boardWidth } from './boardLayout';
 import { CardFlip } from './CardFlip';
 import { WinnerBanner } from './WinnerBanner';
 import { winnerSummary } from './winnerSummary';
@@ -74,20 +74,26 @@ export function TableCenter({ snapshot, winningFive, feltWidth }: TableCenterPro
         </View>
       )}
 
-      <View style={[styles.row, styles.board, { top: ROWS.board }]}>
-        {waiting
-          ? Array.from({ length: MYSTERY_CARDS }, (_, index) => (
-              <PlayingCard key={index} size={cards} mystery />
-            ))
-          : snapshot.board.map((card, index) => (
-              <CardFlip key={card} index={index}>
-                <PlayingCard
-                  card={card}
-                  size={cards}
-                  dimmed={winningFive.size > 0 && !winningFive.has(card)}
-                />
-              </CardFlip>
-            ))}
+      {/* A fixed five-slot frame, centred on the felt and filled left to
+          right: the flop lands in its final slots and the turn and river
+          append, so no card ever moves once dealt — as on a real table. The
+          waiting trio centres itself inside the same frame. */}
+      <View style={[styles.row, { top: ROWS.board }]}>
+        <View style={[styles.board, waiting && styles.boardWaiting, { width: boardWidth(cards) }]}>
+          {waiting
+            ? Array.from({ length: MYSTERY_CARDS }, (_, index) => (
+                <PlayingCard key={index} size={cards} mystery />
+              ))
+            : snapshot.board.map((card, index) => (
+                <CardFlip key={card} index={index}>
+                  <PlayingCard
+                    card={card}
+                    size={cards}
+                    dimmed={winningFive.size > 0 && !winningFive.has(card)}
+                  />
+                </CardFlip>
+              ))}
+        </View>
       </View>
 
       <View style={[styles.row, { top: ROWS.caption }]}>
@@ -125,7 +131,10 @@ const styles = StyleSheet.create({
   },
   board: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: BOARD_GAP,
+  },
+  boardWaiting: {
+    justifyContent: 'center',
   },
 });

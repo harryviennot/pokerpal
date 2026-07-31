@@ -22,8 +22,11 @@ export interface SeatCardsProps {
   winningFive: ReadonlySet<Card>;
   /** Frosted badge over the hand — live equity during an all-in run-out. */
   badge?: string | null;
-  /** This seat is on the clock: the hero's fan perks up while it is. */
-  active?: boolean;
+  /**
+   * The hero's fan sits open: on the clock, at showdown, or once the hand is
+   * over. Tucked only while the hand is live and the turn is elsewhere.
+   */
+  open?: boolean;
 }
 
 /** The hand a seat is holding, tucked behind its name plate. */
@@ -33,9 +36,9 @@ export function SeatCards({
   hero,
   winningFive,
   badge = null,
-  active = false,
+  open = false,
 }: SeatCardsProps) {
-  const lift = useTurnLift(hero && active);
+  const lift = useTurnLift(hero && open);
 
   if (cards === null) {
     return <View style={styles.spacer} />;
@@ -152,6 +155,10 @@ const styles = StyleSheet.create({
   backSecond: {
     marginLeft: -spacing.sm,
     transform: [{ rotate: '5deg' }],
+    // The same left-cast shadow as the hero's top card, so every seat's top
+    // card reads as sitting above the one it overlaps — backs included.
+    boxShadow: '-3px 0 15px rgba(0, 0, 0, 0.2)',
+    borderRadius: radius.xs,
   },
   clip: {
     position: 'absolute',

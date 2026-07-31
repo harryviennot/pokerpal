@@ -26,6 +26,11 @@ export interface TableSeatProps {
   avatar?: ImageSourcePropType;
   /** Frosted badge over the cards — live equity during an all-in run-out. */
   badge?: string | null;
+  /**
+   * Hands are on the table or the hand is over: no turn is coming, so the
+   * hero's fan stays open rather than tucked.
+   */
+  showdown?: boolean;
   /** Which edge of the capsule this seat sits against; puts the face outboard. */
   side?: 'left' | 'right';
 }
@@ -47,6 +52,7 @@ export function TableSeat({
   actionLabel = null,
   avatar,
   badge = null,
+  showdown = false,
   side = 'left',
 }: TableSeatProps) {
   const out = seat.status === 'folded' || seat.status === 'sittingOut';
@@ -68,7 +74,7 @@ export function TableSeat({
       hero={revealed}
       winningFive={winningFive}
       badge={badge}
-      active={active}
+      open={active || showdown}
     />
   );
 
