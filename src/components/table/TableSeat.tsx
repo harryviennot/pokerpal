@@ -68,6 +68,7 @@ export function TableSeat({
       hero={revealed}
       winningFive={winningFive}
       badge={badge}
+      active={active}
     />
   );
 

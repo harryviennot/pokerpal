@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { PlayingCard, type PlayingCardSize } from '@/components/ui/PlayingCard';
 import { type Card } from '@/engine';
-import { radius, spacing } from '@/theme';
+import { useMotionPrefs } from '@/hooks/useMotionPrefs';
+import { radius, spacing, springs } from '@/theme';
 
 import { DealIn } from './DealIn';
 import { EquityBadge } from './EquityBadge';
@@ -19,10 +22,21 @@ export interface SeatCardsProps {
   winningFive: ReadonlySet<Card>;
   /** Frosted badge over the hand — live equity during an all-in run-out. */
   badge?: string | null;
+  /** This seat is on the clock: the hero's fan perks up while it is. */
+  active?: boolean;
 }
 
 /** The hand a seat is holding, tucked behind its name plate. */
-export function SeatCards({ cards, faceUp, hero, winningFive, badge = null }: SeatCardsProps) {
+export function SeatCards({
+  cards,
+  faceUp,
+  hero,
+  winningFive,
+  badge = null,
+  active = false,
+}: SeatCardsProps) {
+  const lift = useTurnLift(hero && active);
+
   if (cards === null) {
     return <View style={styles.spacer} />;
   }
@@ -32,16 +46,18 @@ export function SeatCards({ cards, faceUp, hero, winningFive, badge = null }: Se
   return (
     <View style={styles.hand}>
       {cards.map((card, index) => (
-        <View key={card} style={fan(hero, index)}>
-          <DealIn variant="scale">
-            <PlayingCard
-              size={size}
-              card={faceUp ? card : undefined}
-              faceDown={!faceUp}
-              dimmed={faceUp && winningFive.size > 0 && !winningFive.has(card)}
-            />
-          </DealIn>
-        </View>
+        <Animated.View key={card} style={hero ? lift[index === 0 ? 'first' : 'second'] : null}>
+          <View style={fan(hero, index)}>
+            <DealIn variant="scale">
+              <PlayingCard
+                size={size}
+                card={faceUp ? card : undefined}
+                faceDown={!faceUp}
+                dimmed={faceUp && winningFive.size > 0 && !winningFive.has(card)}
+              />
+            </DealIn>
+          </View>
+        </Animated.View>
       ))}
 
       {badge !== null && (
@@ -64,6 +80,38 @@ function fan(hero: boolean, index: number) {
   }
 
   return index === 0 ? styles.backFirst : styles.backSecond;
+}
+
+/** How far the resting fan tucks down, and how much closer its cards sit, in points. */
+const TUCK = 3;
+
+/**
+ * The hero's fan reacting to the clock: resting, the two cards sit a touch
+ * lower and closer together; when the table turns to the hero they rise and
+ * separate. The translate rides outside the fan's own rotation, so the tuck
+ * moves the cards without disturbing the lean. Instant under reduced motion.
+ */
+function useTurnLift(up: boolean) {
+  const { reduceMotion } = useMotionPrefs();
+  const progress = useSharedValue(up ? 1 : 0);
+
+  useEffect(() => {
+    const target = up ? 1 : 0;
+
+    progress.value = reduceMotion ? target : withSpring(target, springs.deal);
+  }, [up, reduceMotion, progress]);
+
+  const first = useAnimatedStyle(() => ({
+    transform: [{ translateY: TUCK * (1 - progress.value) }],
+  }));
+  const second = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: TUCK * (1 - progress.value) },
+      { translateX: -TUCK * (1 - progress.value) },
+    ],
+  }));
+
+  return { first, second };
 }
 
 const styles = StyleSheet.create({
