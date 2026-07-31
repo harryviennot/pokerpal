@@ -10,11 +10,13 @@
 
 import { create } from 'zustand';
 
-import { type Card, type DecisionReview } from '@/engine';
+import { formatCard, type Card, type DecisionReview } from '@/engine';
+import { getHandHistoryRepo, HandArchiver } from '@/services/handHistory';
 import { type FrameDetections } from '@/services/vision';
 
 import { emptyFusion, fuseFrame, type FusionState } from './fusion';
-import { MAX_LIVE_OPPONENTS, MIN_LIVE_OPPONENTS } from './liveHandState';
+import { LIVE_BIG_BLIND, MAX_LIVE_OPPONENTS, MIN_LIVE_OPPONENTS } from './liveHandState';
+import { buildObservedHand } from './observedHand';
 
 /** Pot and bet facing hero, entered by tap, in big blinds. */
 export interface PotEntry {
@@ -55,6 +57,36 @@ interface LivePlayState {
   endHand: () => void;
   startNextHand: () => void;
   reset: () => void;
+}
+
+/**
+ * One archiver per LivePlay visit: its lazily created session row groups the
+ * hands watched in a sitting, and `reset` retires it so the next visit gets a
+ * fresh session. Module state rather than store state — it is a write queue,
+ * not something a component renders.
+ */
+let archiver: HandArchiver | null = null;
+
+/** Resolves when every enqueued hand write has settled. Tests drain on this. */
+export function drainLiveArchive(): Promise<void> {
+  return archiver?.idle() ?? Promise.resolve();
+}
+
+/** A stable per-hand seed from what was observed — same hand, same record. */
+function seedForHand(
+  hero: readonly [Card, Card],
+  board: readonly Card[],
+  handNumber: number,
+): number {
+  const key = `${hero.map(formatCard).join('')}|${board.map(formatCard).join('')}|${handNumber}`;
+  let hash = 0x811c9dc5;
+
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return hash >>> 0;
 }
 
 const initialState = {
@@ -165,12 +197,53 @@ export const useLivePlayStore = create<LivePlayState>((set, get) => ({
       };
     }),
 
-  recordAdvice: (review) => set((state) => ({ reviews: [...state.reviews, review] })),
+  recordAdvice: (review) =>
+    set((state) => {
+      const last = state.reviews[state.reviews.length - 1];
+
+      // The same spot recomputing — a re-render, a cleared and re-entered pot —
+      // must not archive the same advice twice.
+      if (last && last.reason === review.reason && last.facts.street === review.facts.street) {
+        return state;
+      }
+
+      return { reviews: [...state.reviews, review] };
+    }),
 
   endHand: () => set({ handEnded: true }),
 
-  startNextHand: () =>
-    set((state) => ({
+  startNextHand: () => {
+    const state = get();
+
+    // Only a hand that was actually watched — hero cards entered — is worth a
+    // row. The write is queued; the next hand starts immediately.
+    if (state.heroCards) {
+      archiver ??= new HandArchiver(
+        getHandHistoryRepo,
+        {
+          style: 'cash',
+          seed: seedForHand(state.heroCards, state.fusion.board, 1),
+          heroSeat: 0,
+          blinds: { smallBlind: LIVE_BIG_BLIND / 2, bigBlind: LIVE_BIG_BLIND },
+          origin: 'live',
+        },
+        (saveStatus) => set({ saveStatus }),
+      );
+
+      archiver.recordHand(
+        buildObservedHand({
+          handNumber: state.handsObserved + 1,
+          heroCards: state.heroCards,
+          board: state.fusion.board,
+          opponents: state.opponents,
+          heroStackBb: state.heroStackBb,
+          reviews: state.reviews,
+          seed: seedForHand(state.heroCards, state.fusion.board, state.handsObserved + 1),
+        }),
+      );
+    }
+
+    set((current) => ({
       fusion: emptyFusion(),
       heroCards: null,
       potEntry: null,
@@ -178,10 +251,14 @@ export const useLivePlayStore = create<LivePlayState>((set, get) => ({
       reviews: [],
       handEnded: false,
       phase: 'setup',
-      handsObserved: state.handsObserved + 1,
-    })),
+      handsObserved: current.handsObserved + 1,
+    }));
+  },
 
-  reset: () => set({ ...initialState, fusion: emptyFusion() }),
+  reset: () => {
+    archiver = null;
+    set({ ...initialState, fusion: emptyFusion() });
+  },
 }));
 
 /** Hero and board cards in play, for greying pickers and killing detections. */

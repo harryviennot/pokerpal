@@ -12,7 +12,13 @@
  * would be worse than no banner.
  */
 
-import { createRng, reviewDecision, type Action, type DecisionFacts } from '@/engine';
+import {
+  createRng,
+  reviewDecision,
+  type Action,
+  type DecisionFacts,
+  type DecisionReview,
+} from '@/engine';
 
 import { buildLiveHandState, type LiveObservation } from './liveHandState';
 
@@ -49,6 +55,26 @@ export function computeLiveAdvice(obs: LiveObservation): LiveAdvice | null {
   }
 
   return { best: review.best, reason: reasonFor(review.best, review.facts), facts: review.facts };
+}
+
+/**
+ * The advice as a coach review, for the archived hand.
+ *
+ * Recorded as the line that was recommended — action equals best, zero EV
+ * given up — so an observed hand's stored reviews never charge the player's
+ * leak tallies for decisions nobody watched them make.
+ */
+export function adviceReview(advice: LiveAdvice): DecisionReview {
+  return {
+    seat: 0,
+    action: advice.best,
+    best: advice.best,
+    grade: 'correct',
+    evLoss: 0,
+    reason: advice.reason,
+    leak: null,
+    facts: advice.facts,
+  };
 }
 
 /** A stable seed from everything that changes the answer. */

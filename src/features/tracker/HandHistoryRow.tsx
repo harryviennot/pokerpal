@@ -21,7 +21,10 @@ export function HandHistoryRow({ hand, onPress }: HandHistoryRowProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.details}>
-        <Text variant="subheadline">Hand #{hand.handNumber}</Text>
+        <Text variant="subheadline">
+          Hand #{hand.handNumber}
+          {hand.origin === 'live' ? ' · Live' : ''}
+        </Text>
         <Text variant="caption" tone="secondaryLabel">
           {formatWhen(hand.playedAt)} · {describeCoaching(hand)}
         </Text>

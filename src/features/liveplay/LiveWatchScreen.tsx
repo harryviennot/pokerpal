@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { CardPicker } from '@/components/cards/CardPicker';
@@ -13,6 +13,7 @@ import { BoardStrip } from './BoardStrip';
 import { DemoFeedPanel } from './DemoFeedPanel';
 import { EquityReadout } from './EquityReadout';
 import { DEFAULT_FUSION } from './fusion';
+import { adviceReview } from './liveAdvice';
 import { LiveTopBar } from './LiveTopBar';
 import { PotEntryPanel } from './PotEntryPanel';
 import { useLiveAdvice } from './useLiveAdvice';
@@ -37,12 +38,21 @@ export function LiveWatchScreen() {
   const rejectCandidate = useLivePlayStore((state) => state.rejectCandidate);
   const correctBoardCard = useLivePlayStore((state) => state.correctBoardCard);
   const setPotEntry = useLivePlayStore((state) => state.setPotEntry);
+  const recordAdvice = useLivePlayStore((state) => state.recordAdvice);
   const endHand = useLivePlayStore((state) => state.endHand);
   const startNextHand = useLivePlayStore((state) => state.startNextHand);
 
   const hud = useLiveHud();
   const advice = useLiveAdvice(hud.observation);
   const [correcting, setCorrecting] = useState<number | null>(null);
+
+  // Every recommendation shown goes into the hand's record, so the archived
+  // hand carries what the coach said at the time (PRD A4: session recording).
+  useEffect(() => {
+    if (advice) {
+      recordAdvice(adviceReview(advice));
+    }
+  }, [advice, recordAdvice]);
 
   const correct = (card: Card): void => {
     if (correcting !== null) {

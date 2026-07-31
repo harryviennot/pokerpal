@@ -1,8 +1,9 @@
 import { parseCard, parseCards } from '@/engine';
+import { getHandHistoryRepo } from '@/services/handHistory';
 import { emptyFrames, steadyFrames, type DetectionScript } from '@/services/vision';
 
 import { DEFAULT_FUSION } from './fusion';
-import { liveUsedCards, useLivePlayStore } from './useLivePlayStore';
+import { drainLiveArchive, liveUsedCards, useLivePlayStore } from './useLivePlayStore';
 
 const HERO: readonly [ReturnType<typeof parseCard>, ReturnType<typeof parseCard>] = [
   parseCard('Ah'),
@@ -149,6 +150,34 @@ describe('useLivePlayStore', () => {
     expect(state.handEnded).toBe(false);
     expect(state.phase).toBe('setup');
     expect(state.handsObserved).toBe(1);
+  });
+
+  it('archives the watched hand as a live-origin record', async () => {
+    startWatching();
+    ingest(steadyFrames(FLOP, DEFAULT_FUSION.lockHits));
+    ingest(emptyFrames(DEFAULT_FUSION.handEndFrames));
+
+    useLivePlayStore.getState().startNextHand();
+    await drainLiveArchive();
+
+    const repo = await getHandHistoryRepo();
+    const listed = await repo.listHands();
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.origin).toBe('live');
+
+    const stored = listed[0] ? await repo.getHand(listed[0].id) : null;
+
+    expect(stored?.events.some((event) => event.type === 'streetDealt')).toBe(true);
+    expect(stored?.heroNet).toBe(0);
+  });
+
+  it('does not archive a hand nobody set up', async () => {
+    // Watching never began: no hero cards, no record.
+    useLivePlayStore.getState().startNextHand();
+    await drainLiveArchive();
+
+    expect(await (await getHandHistoryRepo()).listHands()).toHaveLength(0);
   });
 
   it('keeps board and candidate references stable across idle frames', () => {

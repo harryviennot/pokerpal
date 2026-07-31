@@ -29,6 +29,7 @@ interface HandSummaryRow {
   hero_net: number;
   decisions_graded: number;
   ev_lost: number;
+  origin: string;
 }
 
 interface SessionStatRow {
@@ -62,8 +63,8 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
     createSession: (session) =>
       guard('write', async () => {
         const result = await db.runAsync(
-          `INSERT INTO sessions (started_at, style, seed, hero_seat, small_blind, big_blind, ante)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO sessions (started_at, style, seed, hero_seat, small_blind, big_blind, ante, origin)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           session.startedAt,
           session.style,
           session.seed,
@@ -71,6 +72,7 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
           session.blinds.smallBlind,
           session.blinds.bigBlind,
           session.blinds.ante ?? null,
+          session.origin ?? 'game',
         );
 
         return result.lastInsertRowId;
@@ -124,10 +126,11 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
     listHands: (options) =>
       guard('read', async () => {
         const rows = await db.getAllAsync<HandSummaryRow>(
-          `SELECT h.id, h.session_id, h.hand_number, h.played_at, h.hero_net,
+          `SELECT h.id, h.session_id, h.hand_number, h.played_at, h.hero_net, s.origin,
                   COUNT(r.id) AS decisions_graded,
                   COALESCE(SUM(r.ev_loss), 0) AS ev_lost
            FROM hands h
+           JOIN sessions s ON s.id = h.session_id
            LEFT JOIN decision_reviews r ON r.hand_id = h.id
            GROUP BY h.id
            ORDER BY h.played_at DESC, h.id DESC
@@ -144,7 +147,7 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
         // blinds, and SQLite resolves duplicate result names last-wins — a star
         // here would silently overwrite the hand's with the session's.
         const row = await db.getFirstAsync<HandRow>(
-          `SELECT h.*, s.hero_seat,
+          `SELECT h.*, s.hero_seat, s.origin,
                   (SELECT COUNT(*) FROM decision_reviews r WHERE r.hand_id = h.id) AS decisions_graded,
                   (SELECT COALESCE(SUM(r.ev_loss), 0) FROM decision_reviews r WHERE r.hand_id = h.id) AS ev_lost
            FROM hands h
@@ -185,10 +188,11 @@ export async function openSqliteHandHistoryRepo(): Promise<HandHistoryRepo> {
     listSessionHands: (sessionId) =>
       guard('read', async () => {
         const rows = await db.getAllAsync<HandSummaryRow>(
-          `SELECT h.id, h.session_id, h.hand_number, h.played_at, h.hero_net,
+          `SELECT h.id, h.session_id, h.hand_number, h.played_at, h.hero_net, s.origin,
                   COUNT(r.id) AS decisions_graded,
                   COALESCE(SUM(r.ev_loss), 0) AS ev_lost
            FROM hands h
+           JOIN sessions s ON s.id = h.session_id
            LEFT JOIN decision_reviews r ON r.hand_id = h.id
            WHERE h.session_id = ?
            GROUP BY h.id
@@ -292,6 +296,7 @@ function toSummary(row: HandSummaryRow): StoredHandSummary {
     heroNet: row.hero_net,
     decisionsGraded: row.decisions_graded,
     evLost: row.ev_lost,
+    origin: row.origin === 'live' ? 'live' : 'game',
   };
 }
 

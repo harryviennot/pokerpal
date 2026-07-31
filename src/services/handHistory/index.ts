@@ -19,6 +19,7 @@ export {
   type NewHandRecord,
   type NewSessionRecord,
   type SessionId,
+  type SessionOrigin,
   type StoredHand,
   type StoredHandSummary,
   type StoredSessionStat,

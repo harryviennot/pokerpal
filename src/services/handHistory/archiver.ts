@@ -16,13 +16,15 @@ import {
   type TableStyle,
 } from '@/engine';
 
-import { type HandHistoryRepo, type SessionId } from './repo';
+import { type HandHistoryRepo, type SessionId, type SessionOrigin } from './repo';
 
 export interface SessionMeta {
   style: TableStyle;
   seed: number;
   heroSeat: SeatIndex;
   blinds: Blinds;
+  /** Defaults to 'game'; LivePlay sessions pass 'live'. */
+  origin?: SessionOrigin;
 }
 
 export interface ArchivedHand {
@@ -106,6 +108,7 @@ export class HandArchiver {
         seed: this.meta.seed,
         heroSeat: this.meta.heroSeat,
         blinds: this.meta.blinds,
+        origin: this.meta.origin ?? 'game',
       })
       .catch((error: unknown) => {
         this.sessionId = null;
