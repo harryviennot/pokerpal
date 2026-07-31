@@ -108,9 +108,9 @@ describe('HistoryScreen', () => {
 
     await waitFor(() => expect(screen.getByText('YOUR TOP 3 LEAKS')).toBeOnTheScreen());
 
-    expect(screen.getByText('Chasing without the odds ×1')).toBeOnTheScreen();
+    expect(screen.getByText('Paying too much to chase ×1')).toBeOnTheScreen();
     expect(screen.getByText('−18')).toBeOnTheScreen();
-    expect(screen.getByText(/^Focus: Before calling with a draw/)).toBeOnTheScreen();
+    expect(screen.getByText(/^Focus: Before you pay to chase a card/)).toBeOnTheScreen();
   });
 
   it('charts the mistake rate but withholds a direction on one session', async () => {

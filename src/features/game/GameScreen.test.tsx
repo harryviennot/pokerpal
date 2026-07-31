@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, userEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
+import { explainReview } from '@/components/coach/explain';
 import { legalActions, type Action, type HandState } from '@/engine';
 
 import { GameScreen } from './GameScreen';
@@ -204,14 +205,17 @@ describe('GameScreen coaching', () => {
     await render(<GameScreen />);
     await playUntil(() => live().advice?.review != null);
 
-    const reason = live().advice?.review?.reason ?? '';
+    const graded = live().advice?.review;
+    const said = graded
+      ? explainReview(graded, { language: 'plain', bigBlind: live().hand.blinds.bigBlind }).what
+      : '';
 
-    expect(screen.getByText(reason)).toBeOnTheScreen();
+    expect(screen.getByText(said)).toBeOnTheScreen();
 
     await user.press(screen.getByLabelText('Dismiss the coach'));
 
     expect(live().advice).toBeNull();
-    expect(screen.queryByText(reason)).not.toBeOnTheScreen();
+    expect(screen.queryByText(said)).not.toBeOnTheScreen();
   });
 
   it('says nothing mid-session in real mode', async () => {

@@ -1,8 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 
-import { GRADE_LABELS, GRADE_TONES } from '@/components/coach/coachCopy';
+import { gradeLabels, GRADE_TONES } from '@/components/coach/coachCopy';
+import { termForGrade } from '@/components/coach/glossary';
+import { GlossaryLink } from '@/components/coach/GlossaryLink';
 import { Text } from '@/components/ui/Text';
 import { type Grade } from '@/engine';
+import { useCoachLanguage } from '@/hooks/useCoachLanguage';
 
 import { GRADE_ORDER } from './sessionReport';
 
@@ -18,6 +21,8 @@ export interface GradeBreakdownProps {
  * read at a glance than one that does not.
  */
 export function GradeBreakdown({ counts }: GradeBreakdownProps) {
+  const language = useCoachLanguage();
+  const labels = gradeLabels(language);
   const total = GRADE_ORDER.reduce((sum, grade) => sum + counts[grade], 0);
 
   if (total === 0) {
@@ -32,11 +37,12 @@ export function GradeBreakdown({ counts }: GradeBreakdownProps) {
     <>
       {GRADE_ORDER.map((grade) => (
         <View key={grade} style={styles.row}>
-          <Text
+          <GlossaryLink
+            term={termForGrade(grade)}
             variant="subheadline"
             tone={counts[grade] > 0 ? GRADE_TONES[grade] : 'tertiaryLabel'}>
-            {GRADE_LABELS[grade]}
-          </Text>
+            {labels[grade]}
+          </GlossaryLink>
           <Text variant="subheadline" tabular tone="secondaryLabel">
             {String(counts[grade])}
           </Text>

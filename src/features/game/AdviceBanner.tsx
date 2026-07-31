@@ -3,9 +3,11 @@ import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { GRADE_LABELS, GRADE_TONES } from '@/components/coach/coachCopy';
+import { gradeLabels, GRADE_TONES } from '@/components/coach/coachCopy';
+import { explainReview } from '@/components/coach/explain';
 import { Text } from '@/components/ui/Text';
 import { type DecisionReview } from '@/engine';
+import { useCoachLanguage } from '@/hooks/useCoachLanguage';
 import { useMotionPrefs } from '@/hooks/useMotionPrefs';
 import { useTheme } from '@/hooks/useTheme';
 import { MIN_TOUCH_TARGET, radius, spacing, springs } from '@/theme';
@@ -81,8 +83,14 @@ interface NoticeProps {
 function Notice({ review, total, bigBlind, onDismiss }: NoticeProps) {
   const { colors } = useTheme();
   const { reduceMotion } = useMotionPrefs();
+  const language = useCoachLanguage();
   const entry = useSharedValue(reduceMotion ? 1 : 0);
   const tone = GRADE_TONES[review.grade];
+  const grade = gradeLabels(language)[review.grade];
+  // The headline only, not the whole explanation: a notice that takes six
+  // seconds to read is one that leaves before it has been read. The rest is a
+  // tap away in the review sheet this opens.
+  const { what } = explainReview(review, { language, bigBlind });
 
   useEffect(() => {
     entry.value = reduceMotion ? 1 : withSpring(1, springs.notify);
@@ -97,7 +105,7 @@ function Notice({ review, total, bigBlind, onDismiss }: NoticeProps) {
     <Animated.View style={[styles.wrapper, slide]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${GRADE_LABELS[review.grade]}. ${review.reason}`}
+        accessibilityLabel={`${grade}. ${what}`}
         accessibilityHint="Opens the session review"
         onPress={() => router.push('/game/review')}
         style={({ pressed }) => [
@@ -110,7 +118,7 @@ function Notice({ review, total, bigBlind, onDismiss }: NoticeProps) {
         <View style={styles.body}>
           <View style={styles.header}>
             <Text variant="footnote" tone={tone} style={styles.grade}>
-              {GRADE_LABELS[review.grade].toUpperCase()}
+              {grade.toUpperCase()}
             </Text>
             {review.evLoss >= bigBlind / 2 && (
               <Text variant="caption" tabular style={[styles.cost, { color: colors.onFrostBadge }]}>
@@ -120,7 +128,7 @@ function Notice({ review, total, bigBlind, onDismiss }: NoticeProps) {
             )}
           </View>
           <Text variant="subheadline" numberOfLines={2} style={{ color: colors.onFrostBadge }}>
-            {review.reason}
+            {what}
           </Text>
         </View>
 

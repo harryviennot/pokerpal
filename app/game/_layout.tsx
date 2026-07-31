@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { LanguageHeaderButton } from '@/components/coach/LanguageHeaderButton';
+
 /**
  * The game's own stack, chromeless by default.
  *
@@ -22,6 +24,10 @@ export default function GameLayout() {
           presentation: 'formSheet',
           sheetAllowedDetents: [0.6, 1],
           sheetGrabberVisible: true,
+          // Flipping the coach's wording is a one-tap thing you do *while*
+          // reading a verdict, so it lives in the header rather than behind a
+          // navigation to the glossary.
+          headerRight: () => <LanguageHeaderButton />,
         }}
       />
       <Stack.Screen name="summary" />

@@ -2,13 +2,14 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator } from 'react-native';
 
-import { LEAK_FOCUS } from '@/components/coach/coachCopy';
+import { leakFocus } from '@/components/coach/coachCopy';
 import { LeakSummary } from '@/components/coach/LeakSummary';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
 import { Text } from '@/components/ui/Text';
+import { useCoachLanguage } from '@/hooks/useCoachLanguage';
 import { formatChips } from '@/utils/format';
 
 import { HandHistoryRow } from './HandHistoryRow';
@@ -27,6 +28,7 @@ const TOP_LEAKS = 3;
  */
 export function HistoryScreen() {
   const { state, reload } = useHandHistory();
+  const language = useCoachLanguage();
 
   // A hand finished on the table tab appears the moment this tab is opened.
   useFocusEffect(
@@ -81,7 +83,7 @@ export function HistoryScreen() {
         <LeakSummary leaks={top} />
         {focus && (
           <Text variant="footnote" tone="secondaryLabel">
-            Focus: {LEAK_FOCUS[focus]}
+            Focus: {leakFocus(language)[focus]}
           </Text>
         )}
       </Section>

@@ -3,6 +3,8 @@ import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { DecisionRow } from '@/components/coach/DecisionRow';
+import { GlossaryFooter } from '@/components/coach/GlossaryFooter';
+import { LanguageHeaderButton } from '@/components/coach/LanguageHeaderButton';
 import { PokerTable } from '@/components/table/PokerTable';
 import { ReplayCommentary } from '@/components/table/ReplayCommentary';
 import { ReplayControls } from '@/components/table/ReplayControls';
@@ -69,7 +71,14 @@ function ReplayedHand({ hand }: { hand: StoredHand }) {
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: `Hand #${hand.handNumber}` }} />
+      <Stack.Screen
+        options={{
+          title: `Hand #${hand.handNumber}`,
+          // One tap to reword every verdict below, without leaving the hand
+          // they are being read against.
+          headerRight: () => <LanguageHeaderButton />,
+        }}
+      />
 
       {replay.frames.length > 0 && (
         <>
@@ -94,7 +103,9 @@ function ReplayedHand({ hand }: { hand: StoredHand }) {
           />
 
           {/* Held open so the page does not jump as the cursor passes a decision. */}
-          <View style={styles.verdict}>{verdict && <DecisionRow review={verdict} />}</View>
+          <View style={styles.verdict}>
+            {verdict && <DecisionRow review={verdict} bigBlind={hand.blinds.bigBlind} />}
+          </View>
         </>
       )}
 
@@ -102,13 +113,17 @@ function ReplayedHand({ hand }: { hand: StoredHand }) {
 
       <Section title="Decisions">
         {hand.reviews.length > 0 ? (
-          hand.reviews.map((review, index) => <DecisionRow key={index} review={review} />)
+          hand.reviews.map((review, index) => (
+            <DecisionRow key={index} review={review} bigBlind={hand.blinds.bigBlind} />
+          ))
         ) : (
           <Text variant="subheadline" tone="secondaryLabel">
             The hand ended before you had a decision to make.
           </Text>
         )}
       </Section>
+
+      <GlossaryFooter />
     </Screen>
   );
 }

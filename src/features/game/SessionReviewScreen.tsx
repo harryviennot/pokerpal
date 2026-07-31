@@ -1,14 +1,16 @@
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { LEAK_FOCUS } from '@/components/coach/coachCopy';
+import { leakFocus } from '@/components/coach/coachCopy';
 import { DecisionRow } from '@/components/coach/DecisionRow';
+import { GlossaryFooter } from '@/components/coach/GlossaryFooter';
 import { LeakSummary } from '@/components/coach/LeakSummary';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
 import { Text } from '@/components/ui/Text';
 import { summarizeSession, topLeaks } from '@/engine';
+import { useCoachLanguage } from '@/hooks/useCoachLanguage';
 import { formatChips } from '@/utils/format';
 
 import { heroNetOf } from './handRecord';
@@ -30,6 +32,10 @@ import { useGameStore } from './useGameStore';
  */
 export function SessionReviewScreen() {
   const session = useSessionRecords();
+  const language = useCoachLanguage();
+  // The blinds do not move in a learning session, so every verdict on this
+  // sheet was earned at the same level and can honestly be quoted in it.
+  const bigBlind = useGameStore((state) => state.game?.hand.blinds.bigBlind);
 
   if (!session) {
     return (
@@ -78,22 +84,24 @@ export function SessionReviewScreen() {
         <LeakSummary leaks={leaks} />
         {summary.focus && (
           <Text variant="footnote" tone="secondaryLabel">
-            Focus: {LEAK_FOCUS[summary.focus]}
+            Focus: {leakFocus(language)[summary.focus]}
           </Text>
         )}
       </Section>
 
       {(best || worst) && (
         <Section title="Highlights">
-          <Highlight kind="best" highlight={best} />
-          <Highlight kind="worst" highlight={worst} />
+          <Highlight kind="best" highlight={best} bigBlind={bigBlind} />
+          <Highlight kind="worst" highlight={worst} bigBlind={bigBlind} />
         </Section>
       )}
 
       {lastHand && (
         <Section title={`Hand #${lastHand.handNumber}`}>
           {lastHand.reviews.length > 0 ? (
-            lastHand.reviews.map((review, index) => <DecisionRow key={index} review={review} />)
+            lastHand.reviews.map((review, index) => (
+              <DecisionRow key={index} review={review} bigBlind={bigBlind} />
+            ))
           ) : (
             <Text variant="subheadline" tone="secondaryLabel">
               The hand ended before you had a decision to make.
@@ -107,6 +115,8 @@ export function SessionReviewScreen() {
           {"Couldn't save this session's hands — they won't appear in History."}
         </Text>
       )}
+
+      <GlossaryFooter />
     </Screen>
   );
 }
@@ -164,9 +174,11 @@ function useSessionRecords(): SessionRecords | null {
 function Highlight({
   kind,
   highlight,
+  bigBlind,
 }: {
   kind: keyof typeof HIGHLIGHT_LABELS;
   highlight: SessionHighlight | null;
+  bigBlind?: number;
 }) {
   if (!highlight) {
     return null;
@@ -177,7 +189,7 @@ function Highlight({
       <Text variant="caption" tone="tertiaryLabel">
         {`${HIGHLIGHT_LABELS[kind].toUpperCase()} · HAND #${highlight.handNumber}`}
       </Text>
-      <DecisionRow review={highlight.review} />
+      <DecisionRow review={highlight.review} bigBlind={bigBlind} />
     </>
   );
 }

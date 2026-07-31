@@ -200,11 +200,11 @@ describe('SessionSummaryScreen', () => {
 
     await render(<SessionSummaryScreen />);
 
-    expect(screen.getByText('Correct')).toBeOnTheScreen();
-    expect(screen.getByText('Blunder')).toBeOnTheScreen();
+    expect(screen.getByText('Well played')).toBeOnTheScreen();
+    expect(screen.getByText('Costly mistake')).toBeOnTheScreen();
     expect(screen.getByText('3 decisions graded.')).toBeOnTheScreen();
-    expect(screen.getByText('Over-bluffing ×1')).toBeOnTheScreen();
-    expect(screen.getByText(/Focus: Bluff less/)).toBeOnTheScreen();
+    expect(screen.getByText('Bluffing too often ×1')).toBeOnTheScreen();
+    expect(screen.getByText(/Focus: Bluff less often/)).toBeOnTheScreen();
   });
 
   it('replays the best and the worst hand, explaining why each is which', async () => {
@@ -241,9 +241,9 @@ describe('SessionSummaryScreen', () => {
 
     expect(await screen.findByText('BEST DECISION · HAND #1')).toBeOnTheScreen();
     expect(screen.getByText('COSTLIEST DECISION · HAND #2')).toBeOnTheScreen();
-    // The coach's own line is the explanation of why each hand is the one shown.
-    expect(screen.getByText('Called 10% of pot holding 34% equity, needing 9%.')).toBeOnTheScreen();
-    expect(screen.getByText('Called 60% of pot with 12% equity, needing 37%.')).toBeOnTheScreen();
+    // Both hands are explained, each against the pot it was actually played for.
+    expect(screen.getByText(/You paid 25 to stay in, for a pot of 900\./)).toBeOnTheScreen();
+    expect(screen.getByText(/You paid 25 to stay in, for a pot of 100\./)).toBeOnTheScreen();
 
     await user.press(screen.getByLabelText('Costliest decision, hand 2'));
 

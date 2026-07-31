@@ -1,7 +1,9 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { LEAK_FOCUS } from '@/components/coach/coachCopy';
+import { leakFocus } from '@/components/coach/coachCopy';
+import { GlossaryFooter } from '@/components/coach/GlossaryFooter';
+import { LanguageToggle } from '@/components/coach/LanguageToggle';
 import { LeakSummary } from '@/components/coach/LeakSummary';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -10,6 +12,7 @@ import { Section } from '@/components/ui/Section';
 import { StatRow } from '@/components/ui/StatRow';
 import { Text } from '@/components/ui/Text';
 import { currentBlinds, summarizeSession, topLeaks } from '@/engine';
+import { useCoachLanguage } from '@/hooks/useCoachLanguage';
 import { MIN_TOUCH_TARGET, spacing } from '@/theme';
 import { formatChips } from '@/utils/format';
 
@@ -35,6 +38,7 @@ export function SessionSummaryScreen() {
   // patching it any more and there is no re-render to avoid.
   const game = useGameStore((state) => state.game);
   const leave = useGameStore((state) => state.leave);
+  const language = useCoachLanguage();
   const { state: hands, reload } = useSessionHands();
 
   const exit = (destination: '/lobby' | '/history'): void => {
@@ -84,13 +88,17 @@ export function SessionSummaryScreen() {
         <Text variant="footnote" tone="secondaryLabel">
           {`${coached.decisionsGraded} ${coached.decisionsGraded === 1 ? 'decision' : 'decisions'} graded.`}
         </Text>
+        {/* Inline rather than in the header, which this screen does not have.
+            The report is where a player meets the vocabulary in bulk, so the
+            switch belongs beside it. */}
+        <LanguageToggle />
       </Section>
 
       <Section title="Top leaks">
         <LeakSummary leaks={leaks} />
         {coached.focus && (
           <Text variant="footnote" tone="secondaryLabel">
-            Focus: {LEAK_FOCUS[coached.focus]}
+            Focus: {leakFocus(language)[coached.focus]}
           </Text>
         )}
       </Section>
@@ -124,6 +132,7 @@ export function SessionSummaryScreen() {
         <Text variant="footnote" tone="secondaryLabel" style={styles.footnote}>
           Every hand you played is saved in History.
         </Text>
+        <GlossaryFooter />
       </View>
     </Screen>
   );

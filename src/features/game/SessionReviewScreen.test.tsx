@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react-native';
 
 import { type DecisionFacts, type DecisionReview } from '@/engine';
+import { useCoachLanguageStore } from '@/hooks/useCoachLanguage';
 
 import { SessionReviewScreen } from './SessionReviewScreen';
 import { DEFAULT_GAME_SETUP } from './tableSetup';
@@ -113,9 +114,9 @@ describe('SessionReviewScreen', () => {
 
     await render(<SessionReviewScreen />);
 
-    expect(screen.getByText('Over-bluffing ×1')).toBeOnTheScreen();
-    expect(screen.getByText('Chasing without the odds ×1')).toBeOnTheScreen();
-    expect(screen.getByText(/Focus: Bluff less/)).toBeOnTheScreen();
+    expect(screen.getByText('Bluffing too often ×1')).toBeOnTheScreen();
+    expect(screen.getByText('Paying too much to chase ×1')).toBeOnTheScreen();
+    expect(screen.getByText(/Focus: Bluff less often/)).toBeOnTheScreen();
   });
 
   it('says so when nothing leaked', async () => {
@@ -140,6 +141,11 @@ describe('SessionReviewScreen', () => {
   });
 
   it('lists every graded decision of the last hand with its verdict', async () => {
+    // The poker register, because these two decisions differ only in the
+    // engine's own line — in plain English they are the same call for the same
+    // price and would rightly read identically.
+    useCoachLanguageStore.getState().setLanguage('poker');
+
     seedHistory([
       {
         handNumber: 3,
@@ -177,7 +183,7 @@ describe('SessionReviewScreen', () => {
 
     expect(read().game?.coachHistory.length).toBeGreaterThan(0);
     expect(screen.getByText(/^HAND #/)).toBeOnTheScreen();
-    expect(screen.getAllByText(/equity/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Your cards win about/).length).toBeGreaterThan(0);
   });
 
   it('warns when the session could not be saved', async () => {

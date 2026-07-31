@@ -1,4 +1,6 @@
+import { DEFAULT_COACH_LANGUAGE, useCoachLanguageStore } from '@/hooks/useCoachLanguage';
 import { installMemoryHandHistoryRepo } from '@/services/handHistory';
+import { installMemoryPreferencesRepo } from '@/services/preferences';
 
 // React 19 only flushes updates inside act() when this flag is set. Without it
 // the renderer leaks state between tests as timer-driven updates land outside
@@ -9,6 +11,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 // touches expo-sqlite (unavailable under Jest) or another test's writes.
 beforeEach(() => {
   installMemoryHandHistoryRepo();
+  installMemoryPreferencesRepo();
+  // The language store is seeded once, when its module is first imported, so it
+  // outlives the repository it read from and has to be reset separately —
+  // otherwise a test that flips the register leaves every later test in it.
+  useCoachLanguageStore.setState({ language: DEFAULT_COACH_LANGUAGE });
 });
 
 // Reanimated's JS-only test implementation: animations resolve synchronously

@@ -97,7 +97,7 @@ describe('HandReplayScreen', () => {
 
     // The list below the felt always carries every verdict; the felt carries one
     // only while the cursor is on the action it belongs to.
-    const preflop = /^Preflop: Correct\. Called/;
+    const preflop = /^Before the flop: Well played\. You paid/;
 
     expect(screen.getAllByLabelText(preflop)).toHaveLength(1);
 
