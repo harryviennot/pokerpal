@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { parseCard, parseCards } from '@/engine';
 import { useTheme } from '@/hooks/useTheme';
-import { emptyFrames, steadyFrames, type DetectionScript } from '@/services/vision';
+import { emptyFrames, heroPair, steadyFrames, type DetectionScript } from '@/services/vision';
 import { radius, spacing } from '@/theme';
 
 import { useLivePlayStore } from './useLivePlayStore';
@@ -21,13 +21,18 @@ function demoScript(): DetectionScript {
   const flop = parseCards('Qc 7d 2s').map((card, index) => ({ card, bbox: slot(index) }));
   const turn = { card: parseCard('9s'), bbox: slot(3) };
   const river = { card: parseCard('3d'), bbox: slot(4) };
+  // The hero's cards are on screen for the whole hand, exactly as they are on
+  // a real table — so the demo exercises the auto-lock and the advice with no
+  // taps at all.
+  const hero = [...heroPair([parseCard('Ah'), parseCard('Kh')])];
 
   return [
-    ...emptyFrames(10),
-    ...steadyFrames(flop, 12),
-    ...steadyFrames([...flop, turn], 10),
-    ...steadyFrames([...flop, turn, river], 12),
-    ...emptyFrames(24),
+    ...steadyFrames(hero, 10),
+    ...steadyFrames([...hero, ...flop], 12),
+    ...steadyFrames([...hero, ...flop, turn], 10),
+    ...steadyFrames([...hero, ...flop, turn, river], 12),
+    ...steadyFrames(hero, 24),
+    ...emptyFrames(4),
   ];
 }
 

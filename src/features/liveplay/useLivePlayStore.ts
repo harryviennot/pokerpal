@@ -24,11 +24,12 @@ export interface PotEntry {
   toCall: number;
 }
 
-export type LivePlayPhase = 'setup' | 'watching';
+/** Where the hero's cards came from — the camera, or the player's own taps. */
+export type HeroSource = 'vision' | 'manual';
 
 interface LivePlayState {
-  phase: LivePlayPhase;
   heroCards: readonly [Card, Card] | null;
+  heroSource: HeroSource | null;
   opponents: number;
   heroStackBb: number;
   fusion: FusionState;
@@ -44,9 +45,9 @@ interface LivePlayState {
   saveStatus: 'ok' | 'error';
 
   setHeroCards: (cards: readonly [Card, Card] | null) => void;
+  correctHeroCard: (index: 0 | 1, card: Card) => void;
   setOpponents: (count: number) => void;
   setHeroStackBb: (stack: number) => void;
-  beginWatching: () => void;
   ingestFrame: (frame: FrameDetections) => void;
   setPotEntry: (entry: PotEntry) => void;
   clearPotEntry: () => void;
@@ -90,8 +91,8 @@ function seedForHand(
 }
 
 const initialState = {
-  phase: 'setup' as LivePlayPhase,
   heroCards: null,
+  heroSource: null as HeroSource | null,
   opponents: 2,
   heroStackBb: 100,
   fusion: emptyFusion(),
@@ -106,31 +107,52 @@ const initialState = {
 export const useLivePlayStore = create<LivePlayState>((set, get) => ({
   ...initialState,
 
-  setHeroCards: (heroCards) => set({ heroCards }),
+  setHeroCards: (heroCards) =>
+    set((state) => ({
+      heroCards,
+      heroSource: heroCards ? 'manual' : null,
+      // Cards the player replaced must not be re-read off the screen.
+      rejected: [...state.rejected, ...(state.heroCards ?? [])],
+    })),
+
+  correctHeroCard: (index, card) =>
+    set((state) => {
+      const current = state.heroCards;
+
+      if (!current || current.includes(card)) {
+        return state;
+      }
+
+      const heroCards: readonly [Card, Card] =
+        index === 0 ? [card, current[1]] : [current[0], card];
+
+      return { heroCards, heroSource: 'manual', rejected: [...state.rejected, current[index]] };
+    }),
 
   setOpponents: (count) =>
     set({ opponents: Math.min(MAX_LIVE_OPPONENTS, Math.max(MIN_LIVE_OPPONENTS, count)) }),
 
   setHeroStackBb: (stack) => set({ heroStackBb: Math.max(1, stack) }),
 
-  beginWatching: () => {
-    if (get().heroCards) {
-      set({ phase: 'watching' });
-    }
-  },
-
   ingestFrame: (frame) => {
     const state = get();
 
-    if (state.phase !== 'watching' || state.handEnded) {
+    if (state.handEnded) {
       return;
     }
 
     const dead = [...(state.heroCards ?? []), ...state.rejected];
     const fusion = fuseFrame(state.fusion, frame, { dead });
 
+    // The camera fills the hero's cards in only when nobody has: a pair the
+    // player entered or corrected is theirs, and no frame may overwrite it.
+    const adopted =
+      state.heroCards === null && fusion.hero.cards !== null
+        ? { heroCards: fusion.hero.cards, heroSource: 'vision' as const }
+        : null;
+
     if (fusion.handEnded) {
-      set({ fusion, handEnded: true });
+      set({ fusion, handEnded: true, ...adopted });
 
       return;
     }
@@ -138,12 +160,12 @@ export const useLivePlayStore = create<LivePlayState>((set, get) => ({
     // A new street makes the old pot entry a lie; clear it rather than let
     // advice quote a bet that is no longer being faced.
     if (fusion.board.length !== state.fusion.board.length) {
-      set({ fusion, potEntry: null });
+      set({ fusion, potEntry: null, ...adopted });
 
       return;
     }
 
-    set({ fusion });
+    set({ fusion, ...adopted });
   },
 
   setPotEntry: (potEntry) =>
@@ -246,11 +268,11 @@ export const useLivePlayStore = create<LivePlayState>((set, get) => ({
     set((current) => ({
       fusion: emptyFusion(),
       heroCards: null,
+      heroSource: null,
       potEntry: null,
       rejected: [],
       reviews: [],
       handEnded: false,
-      phase: 'setup',
       handsObserved: current.handsObserved + 1,
     }));
   },
