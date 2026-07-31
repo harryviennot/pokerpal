@@ -6,6 +6,108 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-31 — LivePlay slice 1: the camera pipeline, end to end, on a stand-in model
+
+Pillar A's Live Assist (PRD §A2/§A4) as a new `Live` tab: the camera watches a
+real table, board cards lock into a persistent game state, and the coach's own
+rubric recommends a sized action in real time. The whole pipeline exists —
+tab → camera → frame worklet → tensor decode → temporal fusion → store →
+`reviewDecision` → HUD → archive — with the detection model as the one
+swappable stand-in. Bet reading by vision is deliberately **not** in this
+slice: the PRD's Tier 2 quick-tap pot entry is the trustworthy path, and the
+Tier 3 vision estimate stays a flag-gated later slice that will pre-fill the
+sheet, never feed advice silently.
+
+What shipped, bottom up:
+
+1. **`src/services/vision/`** — the camera-free contract. `FrameDetections` is
+   the seam: the real producer is a TFLite frame worklet, the test producer is
+   `scriptedSource` (the `memoryRepo` of this service). `decodeDetections` is
+   worklet-safe, written against the YOLO single-tensor export shape, and
+   fixture-tested; it is the contract a replacement model must meet. The seam
+   is *data-shaped* rather than an interface — everything downstream consumes
+   `FrameDetections` through one store entry point, so Jest and the demo mode
+   run the identical path the camera will.
+2. **`fusion.ts`** — the heart of "keep the state, add to it". Detections
+   audition as candidates keyed by card identity (52 identities make bbox
+   tracking unnecessary); six steady sightings lock, eight misses evaporate a
+   misread, glare flicker survives. The flop commits only as a set of three
+   ordered by box position, then exactly one turn and one river; a locked card
+   is immutable to vision — corrections are store actions, and a corrected or
+   rejected card goes on a dead list the camera cannot resurrect. Two seconds
+   of empty felt past a flop proposes the hand boundary. Every rule has a
+   named test.
+3. **Advice on the Coach's rubric.** `buildLiveHandState` dresses the observed
+   spot (hero cards, locked board, opponent count, tapped pot/bet, all in bb ×
+   100 chips) as a legal `HandState`; `reviewDecision` grades it with the same
+   EV model and bands as post-hand review, seeded per spot so the same spot
+   always says the same thing. Advice recomputes on state change only, never
+   per frame. The banner's `reason` is phrased forward from `facts` — the
+   engine's own reason string describes an action already *taken*.
+4. **Archival.** Schema v2 adds `sessions.origin` ('game' | 'live'); observed
+   hands flow through the existing `HandArchiver` with an honest event log —
+   hero cards, locked streets, synthesized deck with observed cards pinned in
+   deal positions, **no invented actions, hero net zero**. `replayHand`
+   tolerates the action-free log (verified by test), so live hands replay in
+   the tracker with villains simply never revealing. Advice is stored as
+   zero-loss reviews (action = best) so leak tallies never charge the player
+   for decisions nobody watched them make. History rows wear a `Live` tag.
+5. **The ethics gate.** PRD A4's required copy — training tool, banned in
+   casinos, mid-hand use without every player's agreement is cheating — shown
+   before the camera ever mounts, persisted through a new
+   `src/services/settings/` kv-store repo seamed like the hand-history one.
+6. **The native layer, last and isolated.** `react-native-vision-camera` 5 is
+   a full Nitro rewrite: no `useFrameProcessor`, no config plugin. Frames come
+   from `useFrameOutput` with `pixelFormat: 'rgb'` and a `targetResolution` of
+   the model's input size — which made the planned `vision-camera-resize-plugin`
+   unnecessary (it is a v4-era package); `react-native-vision-camera-worklets`
+   is the required companion. Permissions went into `app.json` directly
+   (`ios.infoPlist`, `android.permissions`) since v5 has no plugin.
+   `react-native-fast-tflite` 3 with the Core ML delegate runs the model
+   synchronously in the frame worklet; the 10 Hz pacing gate lives on the
+   React side because fusion's windows are tuned for it. The bundled
+   `assets/models/cards.tflite` is a placeholder — loading fails, the stage
+   falls back to a scripted demo feed, and that fallback is exactly what Jest
+   exercises.
+
+Decisions and traps:
+
+- **Fusion counts frames, not milliseconds.** All its constants assume the
+  10 Hz post rate; the gate that enforces that rate is in
+  `useCardFrameProcessor`, deliberately on the JS side (worklet closures
+  cannot carry state across invocations, and the frame timestamp unit is
+  undocumented in VisionCamera 5 — `Date.now()` at the gate is the one clock
+  everything agrees on).
+- **The worklet transform bites declaration order.** A `'worklet'` function
+  compiled by the reanimated Babel plugin captures its helpers *at definition
+  time*; helpers declared below the caller arrive as `undefined` in Jest.
+  Helpers above callers in any worklet-safe module.
+- **Zustand updates under React 19 need async `act`.** Store writes from
+  outside a component (feeding scripted frames in a screen test) only flush
+  through `await act(async () => …)`; the sync form leaves the tree stale.
+- **Steady state must not churn React.** `fuseFrame` returns reference-stable
+  `board`/`candidates` when nothing changed, so selector-subscribed components
+  sit idle at 10 Hz; the store also bails entirely on frames that change
+  nothing visible.
+- **The stand-in model is AGPL** (`keremberke/yolov8n-playing-cards` class of
+  exports): dev-only, never committed, never shipped. The commercial model is
+  its own slice, gated on the PRD's 95% benchmark set.
+- **A fresh clone typechecks only after `expo-env.d.ts` exists** (generated;
+  gitignored). The generic `require<T>()` typing lives in `expo/types` behind
+  it. Also, the committed lockfile was missing two `@emnapi` entries and
+  `npm ci` refused it; re-synced in this slice.
+- **Expo Go is dead.** VisionCamera + fast-tflite are native modules; the app
+  now needs `npx expo run:ios|android` or an EAS dev build.
+
+Standing gaps, honestly: no device pass yet — camera, permissions, worklet
+runtime compatibility, fps/thermals, and the Core ML delegate are all
+unverified until this branch is built on hardware (CLAUDE.md PR rule 3), and
+the real detector does not exist yet, so detection accuracy is not a claim
+this slice makes anywhere. `expo-doctor` also reports pre-existing patch-level
+version lags (expo 57.0.8 vs .9, RN 0.86.0 vs .2) left for a separate chore.
+
+---
+
 ## 2026-07-30 — The arena: a full-screen game above the tabs, bots that think, and two ways to play
 
 The game is no longer a tab with a header on top of it. It is a full-screen
