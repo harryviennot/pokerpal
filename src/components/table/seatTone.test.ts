@@ -27,6 +27,7 @@ describe('seatTone', () => {
     expect(seatTone(seat(), false, light)).toEqual({
       state: 'waiting',
       background: light.pillDark,
+      backgroundBorder: light.pillDarkBorder,
       ink: light.onPillDark,
     });
   });
@@ -36,14 +37,16 @@ describe('seatTone', () => {
 
     expect(tone.state).toBe('acting');
     expect(tone.background).toBe(light.pillLight);
+    expect(tone.backgroundBorder).toBe(light.pillLightBorder);
     expect(tone.ink).toBe(light.onPillLight);
   });
 
-  it('greys out a seat that folded or sat out', () => {
-    expect(seatTone(seat({ status: 'folded' }), false, light).background).toBe(light.pillFolded);
-    expect(seatTone(seat({ status: 'sittingOut' }), false, light).background).toBe(
-      light.pillFolded,
-    );
+  it('keeps a folded seat dark but fades its ink', () => {
+    const folded = seatTone(seat({ status: 'folded' }), false, light);
+
+    expect(folded.background).toBe(light.pillDark);
+    expect(folded.ink).toBe(light.onPillFolded);
+    expect(seatTone(seat({ status: 'sittingOut' }), false, light).ink).toBe(light.onPillFolded);
   });
 
   it('keeps a folded seat grey even on the frame that names it the actor', () => {

@@ -95,18 +95,24 @@ export interface ColorTokens {
 
   /** Committing actions: Fold, Call, Raise. Red because they cost chips. */
   actionRed: string;
+  /** Border colour for `actionRed`. */
+  actionRedBorder: string;
   /** `actionRed` held down. Derived, not sampled: a still frame has no pressed state. */
   actionRedPressed: string;
   /** Text on `actionRed`. */
   onActionRed: string;
   /** Non-committing controls: Check, All-in, the bet-size presets, +/−. */
   consoleGray: string;
+  /** Border colour for `consoleGray`. */
+  consoleGrayBorder: string;
   /** `consoleGray` held down. Derived, like `actionRedPressed`. */
   consoleGrayPressed: string;
   /** Text on `consoleGray`. */
   onConsoleGray: string;
   /** A console control that is not available at all — darker, never faded. */
   consoleDisabled: string;
+  /** Border colour for `consoleDisabled`. */
+  consoleDisabledBorder: string;
 
   /** A seat waiting its turn. */
   pillDark: string;
@@ -120,18 +126,14 @@ export interface ColorTokens {
   pillLightBorder: string;
   /** Text on `pillLight`. */
   onPillLight: string;
-  /** Text on `pillFolded`. */
+  /** Text on a folded seat's plate, which keeps the dark background. */
   onPillFolded: string;
-  /** Border colour for `pillFolded`. */
-  pillFoldedBorder: string;
   /** The hero's own name plate. */
   platePlain: string;
   /** The hero's plate when they won the pot. */
   plateGold: string;
   /** Gold border that makes `plateGold` read as a win at a glance. */
   plateGoldBorder: string;
-  /** Border colour for `plateGold`. */
-  plateGoldExtraBorder: string;
 
   /** Diamonds in the four-color deck. Clubs stay green-free: only diamonds recolor. */
   suitOrange: string;
@@ -161,13 +163,16 @@ const arena = {
   arenaBackdropDeep: '#0418FD',
   arenaStripe: '#A3C2EE',
   arenaAccent: '#3085FD',
-  actionRed: '#B51721',
+  actionRed: '#C60014',
+  actionRedBorder: '#8B000F',
   actionRedPressed: '#8E1219',
   onActionRed: '#FFFFFF',
-  consoleGray: '#454858',
+  consoleGray: '#444859',
+  consoleGrayBorder: '#2A2C37',
   consoleGrayPressed: '#363948',
   onConsoleGray: '#FFFFFF',
   consoleDisabled: '#30333D',
+  consoleDisabledBorder: '#242830',
   pillDark: '#151A30',
   pillDarkBorder: '#050513',
   onPillDark: '#FFFFFF',

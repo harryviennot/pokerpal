@@ -8,6 +8,7 @@ import {
   type ReplaySeat,
   type TableSnapshot,
 } from '@/engine';
+import { colors } from '@/theme';
 
 import { PokerTable } from './PokerTable';
 
@@ -276,6 +277,16 @@ describe('PokerTable', () => {
       await render(<PokerTable heroSeat={0} snapshot={acting} />);
 
       expect(screen.getByText('Ava')).toBeOnTheScreen();
+    });
+
+    it('inverts the seat the table is waiting on, not the one that just acted', async () => {
+      // Ava (the frame's actor) already raised: her verb sits on a dark plate.
+      // The clock is on the hero, whose plate inverts to white while the table
+      // waits — the reference's language for "it is your turn".
+      await render(<PokerTable heroSeat={0} snapshot={acting} actionLabel="Raise" onClock={0} />);
+
+      expect(screen.getByText('Raise')).toHaveStyle({ color: colors.light.onPillDark });
+      expect(screen.getByText('You')).toHaveStyle({ color: colors.light.onPillLight });
     });
 
     it('badges a hand with the equity the caller worked out', async () => {

@@ -30,3 +30,13 @@ export const BUTTON_SIZE = 26;
 
 /** How far the cards behind a plate rise above its top edge. */
 export const CARD_PEEK = 26;
+
+/**
+ * How far the bust-and-cards row overhangs the plate on each side.
+ *
+ * The row is wider than the plate — a 54-point bust beside two peeking card
+ * backs (30 + 22 overlapped) is 106 points over a 94-point plate — and it is
+ * centred, so six points hang out each side. Edge keep-outs have to count the
+ * overhang or the bust lands nearer the bezel than the margin promises.
+ */
+export const SEAT_PEEK_OVERHANG = 6;

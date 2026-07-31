@@ -58,12 +58,17 @@ export function seatBox(hero: boolean): TableSize {
  * every seat has and the only part whose position the reference pins exactly.
  * The box hangs above it — cards, made-hand plate — so the seat lays its
  * contents out from the bottom up.
+ *
+ * `insetX` keeps every box at least that far from the felt's left and right
+ * edges — the slots hug the capsule, and on a phone the capsule hugs the
+ * screen, so without it a side seat can end up flush with the bezel.
  */
 export function seatSpot(
   seat: SeatIndex,
   heroSeat: SeatIndex,
   count: number,
   size: TableSize,
+  insetX = 0,
 ): Point {
   const slot = slotFor(seat, heroSeat, count).seat;
   const box = seatBox(seat === heroSeat);
@@ -75,6 +80,7 @@ export function seatSpot(
     },
     box,
     size,
+    insetX,
   );
 }
 
@@ -129,14 +135,14 @@ function centre(at: Point, box: TableSize, size: TableSize): Point {
 }
 
 /**
- * Keeps a box on the felt.
+ * Keeps a box on the felt, at least `insetX` in from the sides.
  *
  * The plates deliberately sit flush against the capsule's edge, so rounding or
  * an unusually narrow felt would otherwise push one off the side.
  */
-function clamp(at: Point, box: TableSize, size: TableSize): Point {
+function clamp(at: Point, box: TableSize, size: TableSize, insetX = 0): Point {
   return {
-    x: Math.min(Math.max(at.x, 0), Math.max(0, size.width - box.width)),
+    x: Math.min(Math.max(at.x, insetX), Math.max(insetX, size.width - box.width - insetX)),
     y: Math.min(Math.max(at.y, 0), Math.max(0, size.height - box.height)),
   };
 }

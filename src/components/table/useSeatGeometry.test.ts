@@ -110,6 +110,25 @@ describe('seatSpot', () => {
     }
   });
 
+  it('keeps every box at least the inset in from the sides when one is given', () => {
+    // The game screen passes its screen margin through: side seats hug the
+    // capsule, and the capsule hugs the bezel, so without the inset a plate can
+    // sit flush against the edge of the phone.
+    const inset = 12;
+
+    for (const count of COUNTS) {
+      for (let seat = 0; seat < count; seat++) {
+        const spot = seatSpot(seat, 0, count, SIZE, inset);
+        const box = seatBox(seat === 0);
+
+        expect(spot.x).toBeGreaterThanOrEqual(inset);
+        expect(spot.x + box.width).toBeLessThanOrEqual(SIZE.width - inset + 1e-6);
+        // The inset moves a seat sideways only; its height on the felt holds.
+        expect(spot.y).toBe(seatSpot(seat, 0, count, SIZE).y);
+      }
+    }
+  });
+
   it('gives each chair its own slot, so a busted seat leaves a gap', () => {
     // `count` is every chair, sitting-out ones included: hiding a seat must not
     // shuffle everybody else round the felt.

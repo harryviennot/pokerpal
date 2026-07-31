@@ -45,33 +45,40 @@ export function SeatPill({ seat, active, hero = false, actionLabel = null }: Sea
           ♛
         </Text>
       )}
+      {/* The bevel: the border is the outer view's own colour showing through a
+          thin top inset and a fatter bottom one, which no `borderWidth` can draw. */}
       <Animated.View
         style={[
           styles.pill,
           { width: hero ? HERO_SEAT_WIDTH : SEAT_WIDTH, backgroundColor: tone.backgroundBorder },
-          won && [styles.winner, { borderColor: colors.plateGoldBorder }],
+          won && styles.winner,
           won && { shadowColor: colors.winnerGlow },
           glow,
         ]}>
         <View style={[styles.pillInside, { backgroundColor: tone.background }]}>
-        <Text
-          variant="footnote"
-          numberOfLines={1}
-          style={[
-            styles.name,
-            actionLabel !== null && styles.verb,
-            tone.state === 'folded' && styles.faded,
-            { color: tone.ink },
-          ]}>
-          {actionLabel ?? seat.id}
-        </Text>
-        <Text
-          variant="title3"
-          tabular
-          numberOfLines={1}
-          style={[styles.stack, tone.state === 'folded' && styles.faded, { color: tone.ink }, hero && {fontSize: 18}]}>
-          {stackLine(seat)}
-        </Text>
+          <Text
+            variant="footnote"
+            numberOfLines={1}
+            style={[
+              styles.name,
+              actionLabel !== null && styles.verb,
+              tone.state === 'folded' && styles.faded,
+              { color: tone.ink },
+            ]}>
+            {actionLabel ?? seat.id}
+          </Text>
+          <Text
+            variant="callout"
+            tabular
+            numberOfLines={1}
+            style={[
+              styles.stack,
+              tone.state === 'folded' && styles.faded,
+              { color: tone.ink },
+              hero && styles.heroStack,
+            ]}>
+            {stackLine(seat)}
+          </Text>
         </View>
       </Animated.View>
     </View>
@@ -108,11 +115,12 @@ const styles = StyleSheet.create({
   pillInside: {
     borderRadius: radius.sm - 1.5,
     paddingHorizontal: spacing.sm,
+    // Fills the bevel's inner box. `flex: 1` alone does that; a percentage
+    // height would resolve against nothing while the pill is content-sized.
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    height: '100%',
   },
   winner: {
     shadowRadius: 8,
@@ -129,6 +137,7 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   verb: {
+    // A step up from the footnote name it replaces: shouted, but still a line.
     fontSize: 14,
     fontStyle: 'italic',
     fontWeight: '800',
@@ -137,8 +146,12 @@ const styles = StyleSheet.create({
   },
   stack: {
     fontWeight: '800',
-    fontSize: 16,
     marginTop: -spacing.xs,
+  },
+  // Between callout and title3, neither of which reads right at this width:
+  // callout vanishes under the fanned cards, title3 crowds the bevel.
+  heroStack: {
+    fontSize: 18,
   },
   faded: {
     opacity: 0.7,

@@ -75,6 +75,11 @@ function Felt({ game }: { game: ActiveGame }) {
   const { hand, heroSeat, phase, mode } = game;
   const frame = useShownFrame(game);
   const shown = frame?.snapshot ?? null;
+  // White only while the table is genuinely waiting on a seat: the engine's
+  // `toAct` is ahead of the frames while a burst of events is still revealing,
+  // and pointing at it mid-reveal would put the clock on the wrong seat.
+  const caughtUp = game.shown >= hand.events.length;
+  const onClock = caughtUp && !hand.complete ? hand.toAct : null;
 
   const runout = useRunoutEquity({ snapshot: shown, heroSeat });
   const live = useLiveEquity({ snapshot: shown, heroSeat, enabled: mode === 'learning' });
@@ -99,6 +104,8 @@ function Felt({ game }: { game: ActiveGame }) {
           seatAvatars={portraits(game.avatars)}
           seatBadges={runout ?? live.badges ?? undefined}
           actionLabel={verbOf(frame.event)}
+          onClock={onClock}
+          edgeKeepout={spacing.base}
         />
       </View>
 

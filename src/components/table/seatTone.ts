@@ -31,18 +31,38 @@ export interface SeatTone {
  */
 export function seatTone(seat: ReplaySeat, active: boolean, colors: Theme['colors']): SeatTone {
   if (seat.won > 0) {
-    return { state: 'winner', background: colors.plateGold, backgroundBorder: colors.plateGoldBorder, ink: colors.onPillLight };
+    return {
+      state: 'winner',
+      background: colors.plateGold,
+      backgroundBorder: colors.plateGoldBorder,
+      ink: colors.onPillLight,
+    };
   }
 
   if (seat.status === 'folded' || seat.status === 'sittingOut') {
-    return { state: 'folded', background: colors.pillDark, backgroundBorder: colors.pillDarkBorder, ink: colors.onPillFolded };
+    return {
+      state: 'folded',
+      background: colors.pillDark,
+      backgroundBorder: colors.pillDarkBorder,
+      ink: colors.onPillFolded,
+    };
   }
 
   if (active) {
-    return { state: 'acting', background: colors.pillLight, backgroundBorder: colors.pillLightBorder, ink: colors.onPillLight };
+    return {
+      state: 'acting',
+      background: colors.pillLight,
+      backgroundBorder: colors.pillLightBorder,
+      ink: colors.onPillLight,
+    };
   }
 
-  return { state: 'waiting', background: colors.pillDark, backgroundBorder: colors.pillDarkBorder, ink: colors.onPillDark };
+  return {
+    state: 'waiting',
+    background: colors.pillDark,
+    backgroundBorder: colors.pillDarkBorder,
+    ink: colors.onPillDark,
+  };
 }
 
 /** The plate's second line: chips gained, all in, or the stack behind. */

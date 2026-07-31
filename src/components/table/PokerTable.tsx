@@ -6,6 +6,7 @@ import { spacing } from '@/theme';
 import { DealerButton } from './DealerButton';
 import { GameBackdrop } from './GameBackdrop';
 import { SeatAvatar } from './SeatAvatar';
+import { SEAT_PEEK_OVERHANG } from './seatMetrics';
 import { capsuleRect } from './tableArt';
 import { TableBet } from './TableBet';
 import { TableCenter } from './TableCenter';
@@ -31,6 +32,19 @@ export interface PokerTableProps {
   seatBadges?: readonly (string | null)[];
   /** The verb the acting seat just played, from the frame being shown. */
   actionLabel?: string | null;
+  /**
+   * The seat the table is waiting on, whose plate inverts to white.
+   *
+   * Distinct from the frame's `actor`, who has already acted and shows the verb
+   * on a dark plate. A replay has nobody on the clock, so the default is nobody.
+   */
+  onClock?: SeatIndex | null;
+  /**
+   * Minimum distance between a seat's box and this component's own edges, in
+   * points. The full-bleed game screen passes its screen margin here; a host
+   * that already pads itself can leave it at zero.
+   */
+  edgeKeepout?: number;
   /** Paints the arena field behind the felt. Off when the screen paints its own. */
   backdrop?: boolean;
 }
@@ -61,11 +75,17 @@ export function PokerTable({
   seatAvatars,
   seatBadges,
   actionLabel = null,
+  onClock = null,
+  edgeKeepout = 0,
   backdrop = true,
 }: PokerTableProps) {
   const { size, measured, onLayout } = useSeatGeometry();
   const capsule = capsuleRect(size, MARGIN);
   const felt = { width: capsule.width, height: capsule.height };
+  // The keep-out is measured from this component's edge to the seat's nearest
+  // visible pixel — the bust overhangs the positioned box, so it is counted in.
+  // The felt starts `capsule.left` in already; only the shortfall constrains.
+  const seatInset = Math.max(0, edgeKeepout + SEAT_PEEK_OVERHANG - capsule.left);
   const winning = winningFive(snapshot);
   const count = snapshot.seats.length;
   const hero = snapshot.seats[heroSeat];
@@ -98,7 +118,7 @@ export function PokerTable({
           }
 
           const isHero = seat.seat === heroSeat;
-          const spot = seatSpot(seat.seat, heroSeat, count, felt);
+          const spot = seatSpot(seat.seat, heroSeat, count, felt, seatInset);
           const bet = betSpot(seat.seat, heroSeat, count, felt);
           const button = buttonSpot(seat.seat, heroSeat, count, felt);
 
@@ -107,7 +127,7 @@ export function PokerTable({
               <View style={[styles.absolute, spotStyle(spot), seatBox(isHero)]}>
                 <TableSeat
                   seat={seat}
-                  active={seat.seat === snapshot.actor}
+                  active={seat.seat === onClock}
                   revealed={isHero}
                   winningFive={winning}
                   handLabel={madeHandLabel(seat, snapshot, isHero)}

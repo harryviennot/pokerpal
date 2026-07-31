@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, type StyleProp, type ViewStyle, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/useTheme';
@@ -29,6 +29,7 @@ export interface ConsoleButtonProps {
   onPress: () => void;
   /** The caller owns the footprint: an action button is taller than a preset. */
   style?: StyleProp<ViewStyle>;
+  isActionRow?: boolean;
 }
 
 /**
@@ -48,6 +49,7 @@ export function ConsoleButton({
   disabled = false,
   onPress,
   style,
+  isActionRow = false
 }: ConsoleButtonProps) {
   const { colors } = useTheme();
   const skin = skinFor(tone, colors);
@@ -71,9 +73,11 @@ export function ConsoleButton({
       onPress={press}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: pressed ? skin.pressed : skin.background },
+        { backgroundColor: pressed ? skin.pressed : skin.backgroundBorder },
+        isActionRow ? { padding : 2.5, paddingBottom: 6 } : { padding : 1.5, paddingBottom: 4 },
         style,
       ]}>
+        <View style={[styles.buttonInside, { backgroundColor: skin.background, borderRadius: isActionRow ? radius.sm - 2.5 : radius.sm - 1.5}]}>
       <Text
         variant="headline"
         tabular
@@ -90,12 +94,14 @@ export function ConsoleButton({
           {caption}
         </Text>
       )}
+      </View>
     </Pressable>
   );
 }
 
 interface Skin {
   background: string;
+  backgroundBorder: string;
   pressed: string;
   ink: string;
   /** True where the ink itself has to read as unavailable, not just the slab. */
@@ -107,6 +113,7 @@ function skinFor(tone: ConsoleTone, colors: ColorTokens): Skin {
     case 'commit':
       return {
         background: colors.actionRed,
+        backgroundBorder: colors.actionRedBorder,
         pressed: colors.actionRedPressed,
         ink: colors.onActionRed,
         faded: false,
@@ -114,6 +121,7 @@ function skinFor(tone: ConsoleTone, colors: ColorTokens): Skin {
     case 'quiet':
       return {
         background: colors.consoleGray,
+        backgroundBorder: colors.consoleGrayBorder,
         pressed: colors.consoleGrayPressed,
         ink: colors.onConsoleGray,
         faded: false,
@@ -121,6 +129,7 @@ function skinFor(tone: ConsoleTone, colors: ColorTokens): Skin {
     case 'armed':
       return {
         background: colors.pillLight,
+        backgroundBorder: colors.pillLightBorder,
         pressed: colors.pillLight,
         ink: colors.onPillLight,
         faded: false,
@@ -128,6 +137,7 @@ function skinFor(tone: ConsoleTone, colors: ColorTokens): Skin {
     case 'off':
       return {
         background: colors.consoleDisabled,
+        backgroundBorder: colors.consoleDisabledBorder,
         pressed: colors.consoleDisabled,
         ink: colors.onConsoleGray,
         faded: true,
@@ -139,8 +149,14 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xs,
     borderRadius: radius.sm,
+  },
+  buttonInside: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   headline: {
     fontWeight: '800',

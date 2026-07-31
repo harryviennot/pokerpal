@@ -41,6 +41,7 @@ export function ActionRow({ legal, betTo, stack, onAct }: ActionRowProps) {
           haptic="commit"
           onPress={commit({ type: 'fold' })}
           style={styles.button}
+          isActionRow
         />
       )}
       {check && (
@@ -50,6 +51,7 @@ export function ActionRow({ legal, betTo, stack, onAct }: ActionRowProps) {
           haptic="commit"
           onPress={commit({ type: 'check' })}
           style={styles.button}
+          isActionRow
         />
       )}
       {call && (
@@ -62,6 +64,7 @@ export function ActionRow({ legal, betTo, stack, onAct }: ActionRowProps) {
           haptic="commit"
           onPress={commit({ type: 'call' })}
           style={styles.button}
+          isActionRow
         />
       )}
       {raise && (
@@ -72,6 +75,7 @@ export function ActionRow({ legal, betTo, stack, onAct }: ActionRowProps) {
           haptic="commit"
           onPress={commit({ type: raise.type, to: betTo })}
           style={styles.button}
+          isActionRow
         />
       )}
     </View>
