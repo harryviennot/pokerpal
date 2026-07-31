@@ -11,9 +11,8 @@ import {
   type SeatIndex,
   type TableSnapshot,
 } from '@/engine';
+import { useChunkedEquity } from '@/hooks/useChunkedEquity';
 import { formatPercentWhole } from '@/utils/format';
-
-import { useChunkedEquity } from './useChunkedEquity';
 
 export interface UseLiveEquityInput {
   /**
