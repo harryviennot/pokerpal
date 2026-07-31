@@ -82,6 +82,9 @@ const styles = StyleSheet.create({
   heroSecond: {
     marginLeft: -spacing.md,
     transform: [{ rotate: '5deg' }],
+    // Left-cast shadow so the top card reads as sitting above the one it overlaps.
+    boxShadow: '-6px 0 10px rgba(0, 0, 0, 0.35)',
+    borderRadius: radius.xs,
   },
   backFirst: {
     transform: [{ rotate: '-8deg' }],
