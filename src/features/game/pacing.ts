@@ -107,7 +107,7 @@ export const PRESELECT_BEAT_MS = 400;
  * then whose move it is — a plate that lights while a card is still turning
  * muddles the two.
  */
-const STREET_SETTLE_BASE_MS = 560;
+const STREET_SETTLE_BASE_MS = 700;
 
 /**
  * Board cards flip on `CardFlip`'s 70 ms stagger by board position, so each
