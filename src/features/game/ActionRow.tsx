@@ -24,6 +24,10 @@ export interface ActionRowProps {
  * opinion about the rules anywhere in the UI, which is what makes an illegal tap
  * unrepresentable rather than merely rejected. Red, because everything on this row
  * costs chips or gives up a hand.
+ *
+ * Each action owns a fixed third of the row; an action the engine did not offer
+ * leaves its slot empty rather than letting the others widen. Muscle memory can
+ * trust the geography — a tap where Fold usually sits never lands on Check.
  */
 export function ActionRow({ legal, betTo, stack, onAct }: ActionRowProps) {
   const fold = legal.some((action) => action.type === 'fold');
@@ -34,50 +38,56 @@ export function ActionRow({ legal, betTo, stack, onAct }: ActionRowProps) {
 
   return (
     <View style={styles.row}>
-      {fold && (
-        <ConsoleButton
-          headline="Fold"
-          tone="commit"
-          haptic="commit"
-          onPress={commit({ type: 'fold' })}
-          style={styles.button}
-          isActionRow
-        />
-      )}
-      {check && (
-        <ConsoleButton
-          headline="Check"
-          tone="commit"
-          haptic="commit"
-          onPress={commit({ type: 'check' })}
-          style={styles.button}
-          isActionRow
-        />
-      )}
-      {call && (
-        <ConsoleButton
-          headline="Call"
-          // The reference says "All-in" rather than the number when a call is for
-          // everything: the amount is the least interesting part of it.
-          caption={call.amount >= stack ? 'All-in' : formatChips(call.amount)}
-          tone="commit"
-          haptic="commit"
-          onPress={commit({ type: 'call' })}
-          style={styles.button}
-          isActionRow
-        />
-      )}
-      {raise && (
-        <ConsoleButton
-          headline={raise.type === 'bet' ? 'Bet' : 'Raise'}
-          caption={betTo >= raise.max ? 'All-in' : formatChips(betTo)}
-          tone="commit"
-          haptic="commit"
-          onPress={commit({ type: raise.type, to: betTo })}
-          style={styles.button}
-          isActionRow
-        />
-      )}
+      <View style={styles.slot}>
+        {fold && (
+          <ConsoleButton
+            headline="Fold"
+            tone="commit"
+            haptic="commit"
+            onPress={commit({ type: 'fold' })}
+            style={styles.button}
+            isActionRow
+          />
+        )}
+      </View>
+      <View style={styles.slot}>
+        {check && (
+          <ConsoleButton
+            headline="Check"
+            tone="commit"
+            haptic="commit"
+            onPress={commit({ type: 'check' })}
+            style={styles.button}
+            isActionRow
+          />
+        )}
+        {call && (
+          <ConsoleButton
+            headline="Call"
+            // The reference says "All-in" rather than the number when a call is for
+            // everything: the amount is the least interesting part of it.
+            caption={call.amount >= stack ? 'All-in' : formatChips(call.amount)}
+            tone="commit"
+            haptic="commit"
+            onPress={commit({ type: 'call' })}
+            style={styles.button}
+            isActionRow
+          />
+        )}
+      </View>
+      <View style={styles.slot}>
+        {raise && (
+          <ConsoleButton
+            headline={raise.type === 'bet' ? 'Bet' : 'Raise'}
+            caption={betTo >= raise.max ? 'All-in' : formatChips(betTo)}
+            tone="commit"
+            haptic="commit"
+            onPress={commit({ type: raise.type, to: betTo })}
+            style={styles.button}
+            isActionRow
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -87,8 +97,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  button: {
+  slot: {
     flex: 1,
+  },
+  button: {
     height: MIN_TOUCH_TARGET + spacing.sm,
   },
 });
