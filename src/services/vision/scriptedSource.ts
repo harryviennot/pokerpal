@@ -8,15 +8,21 @@
 
 import { type Card } from '@/engine';
 
-import { type DetectedCard, type FrameDetections, type NormalizedRect } from './types';
+import {
+  type CardZone,
+  type DetectedCard,
+  type FrameDetections,
+  type NormalizedRect,
+} from './types';
 
 export type DetectionScript = readonly FrameDetections[];
 
-/** A card in a scripted frame; confidence and box are optional stage props. */
+/** A card in a scripted frame; confidence, box and zone are optional stage props. */
 export interface ScriptedCard {
   card: Card;
   confidence?: number;
   bbox?: NormalizedRect;
+  zone?: CardZone;
 }
 
 const DEFAULT_CONFIDENCE = 0.9;
@@ -33,10 +39,19 @@ export function frameOf(cards: readonly (Card | ScriptedCard)[], timestampMs = 0
       card: scripted.card,
       confidence: scripted.confidence ?? DEFAULT_CONFIDENCE,
       bbox: scripted.bbox ?? slotBox(index),
+      ...(scripted.zone === undefined ? {} : { zone: scripted.zone }),
     };
   });
 
   return { cards: detections, timestampMs };
+}
+
+/** The hero's two hole cards, as a fanned pair at the bottom of the frame. */
+export function heroPair(cards: readonly [Card, Card]): readonly ScriptedCard[] {
+  return [
+    { card: cards[0], zone: 'hero', bbox: heroSlotBox(0) },
+    { card: cards[1], zone: 'hero', bbox: heroSlotBox(1) },
+  ];
 }
 
 /** The same cards, seen steadily for `count` frames. */
@@ -71,7 +86,12 @@ export function flicker(
   return script.map((frame, index) => ({ ...frame, timestampMs: index }));
 }
 
-/** The default stage position of the `index`-th card in a frame. */
+/** The default stage position of the `index`-th board card in a frame. */
 export function slotBox(index: number): NormalizedRect {
   return { x: 0.1 + index * 0.16, y: 0.4, width: 0.12, height: 0.2 };
+}
+
+/** The stage position of the `index`-th hero card: a low, centred fanned pair. */
+export function heroSlotBox(index: 0 | 1): NormalizedRect {
+  return { x: 0.4 + index * 0.1, y: 0.74, width: 0.13, height: 0.16 };
 }
