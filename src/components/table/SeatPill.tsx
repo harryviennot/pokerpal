@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
+import { AnimatedText } from '@/components/ui/AnimatedText';
 import { Text } from '@/components/ui/Text';
 import { type ReplaySeat } from '@/engine';
 import { useMotionPrefs } from '@/hooks/useMotionPrefs';
@@ -9,7 +10,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing, springs } from '@/theme';
 
 import { HERO_SEAT_WIDTH, PILL_HEIGHT, SEAT_WIDTH } from './seatMetrics';
-import { seatTone, stackLine } from './seatTone';
+import { seatTone, stackLine, type SeatTone } from './seatTone';
 
 export interface SeatPillProps {
   seat: ReplaySeat;
@@ -34,6 +35,7 @@ export function SeatPill({ seat, active, hero = false, actionLabel = null }: Sea
   const tone = seatTone(seat, active, colors);
   const won = tone.state === 'winner';
   const glow = useWinnerGlow(won);
+  const fade = useToneTransition(tone);
 
   return (
     <View style={styles.wrapper}>
@@ -50,39 +52,69 @@ export function SeatPill({ seat, active, hero = false, actionLabel = null }: Sea
       <Animated.View
         style={[
           styles.pill,
-          { width: hero ? HERO_SEAT_WIDTH : SEAT_WIDTH, backgroundColor: tone.backgroundBorder },
+          { width: hero ? HERO_SEAT_WIDTH : SEAT_WIDTH },
           won && styles.winner,
           won && { shadowColor: colors.winnerGlow },
+          fade.pill,
           glow,
         ]}>
-        <View style={[styles.pillInside, { backgroundColor: tone.background }]}>
-          <Text
+        <Animated.View style={[styles.pillInside, fade.inside]}>
+          <AnimatedText
             variant="footnote"
             numberOfLines={1}
             style={[
               styles.name,
               actionLabel !== null && styles.verb,
               tone.state === 'folded' && styles.faded,
-              { color: tone.ink },
+              fade.ink,
             ]}>
             {actionLabel ?? seat.id}
-          </Text>
-          <Text
+          </AnimatedText>
+          <AnimatedText
             variant="callout"
             tabular
             numberOfLines={1}
             style={[
               styles.stack,
               tone.state === 'folded' && styles.faded,
-              { color: tone.ink },
               hero && styles.heroStack,
+              fade.ink,
             ]}>
             {stackLine(seat)}
-          </Text>
-        </View>
+          </AnimatedText>
+        </Animated.View>
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * Springs the plate's three colours toward the current tone, so a state change
+ * crossfades instead of snapping; instant when motion is reduced. The `tone`
+ * preset is critically damped on purpose — see its note in `theme/motion`.
+ */
+function useToneTransition(tone: SeatTone) {
+  const { reduceMotion } = useMotionPrefs();
+  const { background, backgroundBorder, ink } = tone;
+
+  const pill = useAnimatedStyle(
+    () => ({
+      backgroundColor: reduceMotion ? backgroundBorder : withSpring(backgroundBorder, springs.tone),
+    }),
+    [backgroundBorder, reduceMotion],
+  );
+  const inside = useAnimatedStyle(
+    () => ({
+      backgroundColor: reduceMotion ? background : withSpring(background, springs.tone),
+    }),
+    [background, reduceMotion],
+  );
+  const inkStyle = useAnimatedStyle(
+    () => ({ color: reduceMotion ? ink : withSpring(ink, springs.tone) }),
+    [ink, reduceMotion],
+  );
+
+  return { pill, inside, ink: inkStyle };
 }
 
 /** Springs the gold shadow in when the seat takes the pot; static without motion. */
