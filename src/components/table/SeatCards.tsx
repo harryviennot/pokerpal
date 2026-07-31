@@ -82,14 +82,18 @@ function fan(hero: boolean, index: number) {
   return index === 0 ? styles.backFirst : styles.backSecond;
 }
 
-/** How far the resting fan tucks down, and how much closer its cards sit, in points. */
-const TUCK = 3;
+/** How far each card slides outward when the fan opens, in points. */
+const SPREAD = 8;
+
+/** How far the open fan rises, in points. */
+const LIFT = 4;
 
 /**
- * The hero's fan reacting to the clock: resting, the two cards sit a touch
- * lower and closer together; when the table turns to the hero they rise and
- * separate. The translate rides outside the fan's own rotation, so the tuck
- * moves the cards without disturbing the lean. Instant under reduced motion.
+ * The hero's fan reacting to the clock: resting it sits in its ordinary spot
+ * behind the plate; when the table turns to the hero it opens — each card
+ * slides outward and the pair rises. The translate rides outside the fan's
+ * own rotation, so opening never disturbs the lean. Instant under reduced
+ * motion.
  */
 function useTurnLift(up: boolean) {
   const { reduceMotion } = useMotionPrefs();
@@ -102,13 +106,10 @@ function useTurnLift(up: boolean) {
   }, [up, reduceMotion, progress]);
 
   const first = useAnimatedStyle(() => ({
-    transform: [{ translateY: TUCK * (1 - progress.value) }],
+    transform: [{ translateX: -SPREAD * progress.value }, { translateY: -LIFT * progress.value }],
   }));
   const second = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: TUCK * (1 - progress.value) },
-      { translateX: -TUCK * (1 - progress.value) },
-    ],
+    transform: [{ translateX: SPREAD * progress.value }, { translateY: -LIFT * progress.value }],
   }));
 
   return { first, second };
