@@ -6,6 +6,11 @@
  * pot offered, the draws that were live, the stack-to-pot ratio — is already
  * computed by a module below it. The coach adds judgement, not arithmetic.
  *
+ * Specifically it adds judgement to `recommend.ts`, which does the measuring and
+ * the ranking. That split is load-bearing: the guide the player sees *before*
+ * they act and the grade they get *after* come from one implementation, so the
+ * two can never contradict each other in front of them.
+ *
  * The unit throughout is **chips of expected value given up**, converted to big
  * blinds for the grade. That choice matters: a grade has to mean the same thing
  * at 5/10 as at 50/100, and "how many chips did that cost you" is the only
@@ -18,28 +23,27 @@
  * and what is deliberately not.
  *
  * What this file does **not** do is speak. It produces a grade, a number and a
- * terse factual reason; the LLM layer in `src/services` turns those into
- * sentences and may never invent a figure that did not come from here.
+ * terse factual reason; the plain-English layer in `src/components/coach` turns
+ * those into sentences and may never invent a figure that did not come from here.
  */
 
-import { legalActions } from './betting';
-import { type Card } from './cards';
-import { detectDraws } from './draws';
-import { simulateEquity, type OpponentSpec } from './equity';
 import { type HandEvent, type Street } from './events';
 import { applyAction, dealHand } from './hand';
-import { chenScore, modelOpponents } from './rangeModel';
-import { type Rng } from './rng';
+import { chenScore } from './rangeModel';
 import {
-  amountToCall,
-  contestingPlayers,
-  playerAt,
-  totalPot,
-  type Action,
-  type HandState,
-  type SeatIndex,
-  type TableConfig,
-} from './table';
+  lineValue,
+  recommend,
+  type CoachOptions,
+  type DecisionFacts,
+  type Recommendation,
+} from './recommend';
+import { playerAt, type Action, type HandState, type SeatIndex, type TableConfig } from './table';
+
+/**
+ * Re-exported so the coach still reads as one vocabulary from the outside, and
+ * so every existing importer of `./coach` keeps working after the split.
+ */
+export { type CoachOptions, type DecisionFacts, type Recommendation };
 
 export type Grade = 'correct' | 'marginal' | 'mistake' | 'blunder';
 
@@ -49,25 +53,6 @@ export type Grade = 'correct' | 'marginal' | 'mistake' | 'blunder';
  */
 export type Leak =
   'preflopLooseness' | 'chasingWithoutOdds' | 'missedValue' | 'overBluffing' | 'positional';
-
-/** Everything the coach measured, kept alongside the verdict so it can be shown. */
-export interface DecisionFacts {
-  street: Street;
-  /** Seats yet to act behind hero. Zero means hero closed the action. */
-  playersBehind: number;
-  /** Chips in the middle before hero acts, the bet being faced included. */
-  pot: number;
-  toCall: number;
-  stack: number;
-  /** Stack-to-pot ratio. `Infinity` when the pot is somehow empty. */
-  spr: number;
-  /** Hero's equity against the modelled ranges, 0 to 1. */
-  equity: number;
-  /** Equity needed to break even on the call. Zero when checking is free. */
-  requiredEquity: number;
-  /** Cards that complete a detected draw. Empty preflop and on the river. */
-  outs: number;
-}
 
 export interface DecisionReview {
   seat: SeatIndex;
@@ -88,15 +73,6 @@ export interface DecisionPoint {
   state: HandState;
   action: Action;
 }
-
-export interface CoachOptions {
-  /** Monte Carlo samples per decision. Review is not on the hot path; be accurate. */
-  iterations?: number;
-  /** Required. Grading is deterministic given the same RNG. */
-  rng: Rng;
-}
-
-const DEFAULT_ITERATIONS = 2_000;
 
 /**
  * Grade thresholds, in big blinds of expected value given up.
@@ -141,13 +117,14 @@ const STREET_WEIGHT: Record<Street, number> = {
 /** Below this Chen score, entering a pot voluntarily is a losing habit. */
 const LOOSE_ENTRY_SCORE = 8;
 
-/** The share of the pot a value bet is assumed to make when it is called. */
-const VALUE_BET_FRACTION = 0.66;
-
 /**
  * Grades one decision, in the state the table was in when it was made.
  *
  * `state` must be waiting on `state.toAct`, and `action` is what that seat did.
+ *
+ * The ranking is `recommend`'s, unchanged and unweighted. Only the *severity* is
+ * this file's business, which is why `STREET_WEIGHT` is applied here and nowhere
+ * near the lines themselves.
  */
 export function reviewDecision(
   state: HandState,
@@ -155,54 +132,26 @@ export function reviewDecision(
   options: CoachOptions,
 ): DecisionReview | null {
   const seat = state.toAct;
+  const recommendation = seat === null ? null : recommend(state, seat, options);
 
-  if (seat === null || state.complete) {
+  if (seat === null || !recommendation) {
     return null;
   }
 
-  const player = playerAt(state, seat);
-
-  if (!player.holeCards) {
-    return null;
-  }
-
-  const facts = measure(state, seat, player.holeCards, options);
-  const pot = facts.pot;
-  const toCall = facts.toCall;
-
-  // Chips already in the middle are sunk: folding is worth exactly nothing from
-  // here, which is what every other line is measured against.
-  const evCall = toCall > 0 ? facts.equity * (pot + toCall) - toCall : 0;
-  const canRaise = legalActions(state).some(
-    (legal) => legal.type === 'bet' || legal.type === 'raise',
-  );
-  const evValueBet = canRaise ? valueBetEv(pot, facts.equity) : Number.NEGATIVE_INFINITY;
-
-  const lines: { action: Action; ev: number }[] = [
-    toCall > 0 ? { action: { type: 'fold' }, ev: 0 } : { action: { type: 'check' }, ev: 0 },
-  ];
-
-  if (toCall > 0) {
-    lines.push({ action: { type: 'call' }, ev: evCall });
-  }
-
-  if (canRaise) {
-    lines.push({ action: raiseAction(state, seat, pot, toCall), ev: evValueBet });
-  }
-
-  const best = lines.reduce((a, b) => (b.ev > a.ev ? b : a));
-  const taken = evOf(action, evCall, evValueBet);
-  const evLoss = Math.max(0, best.ev - taken) * (STREET_WEIGHT[facts.street] ?? 1);
+  const { facts, best } = recommendation;
+  const bestEv = lineValue(recommendation, best);
+  const evLoss =
+    Math.max(0, bestEv - lineValue(recommendation, action)) * (STREET_WEIGHT[facts.street] ?? 1);
   const bigBlind = state.blinds.bigBlind || 1;
 
   return {
     seat,
     action,
-    best: best.action,
+    best,
     grade: gradeFor(evLoss / bigBlind),
     evLoss,
     reason: describe(action, facts, evLoss),
-    leak: leakFor(action, facts, evLoss, best.action, state, seat),
+    leak: leakFor(action, facts, evLoss, best, state, seat),
     facts,
   };
 }
@@ -271,97 +220,6 @@ export function reviewHand(
   return decisionPoints(config, events, seat)
     .map((point) => reviewDecision(point.state, point.action, options))
     .filter((review): review is DecisionReview => review !== null);
-}
-
-/** Everything the coach measures before it judges anything. */
-function measure(
-  state: HandState,
-  seat: SeatIndex,
-  hole: readonly [Card, Card],
-  options: CoachOptions,
-): DecisionFacts {
-  const pot = totalPot(state);
-  const toCall = amountToCall(state, seat);
-  const player = playerAt(state, seat);
-  const opponents = contestingPlayers(state).filter((other) => other.seat !== seat);
-
-  const equity =
-    opponents.length === 0
-      ? 1
-      : simulateEquity({
-          hero: hole,
-          board: state.board,
-          opponents: specsFor(state, seat, hole, opponents.length),
-          iterations: options.iterations ?? DEFAULT_ITERATIONS,
-          rng: options.rng,
-        }).equity;
-
-  return {
-    street: state.street,
-    playersBehind: opponents.filter((other) => !other.hasActedThisStreet).length,
-    pot,
-    toCall,
-    stack: player.stack,
-    spr: pot > 0 ? player.stack / pot : Infinity,
-    equity,
-    requiredEquity: toCall > 0 ? toCall / (pot + toCall) : 0,
-    outs: detectDraws(hole, state.board).outCount,
-  };
-}
-
-/** Ranges for every live opponent, so equity is measured against a read. */
-function specsFor(
-  state: HandState,
-  seat: SeatIndex,
-  hole: readonly [Card, Card],
-  count: number,
-): OpponentSpec[] {
-  const models = modelOpponents(state, seat, { dead: hole });
-  const specs = [...models.values()]
-    .filter((model) => model.combos.length > 0)
-    .map((model) => ({ kind: 'range', combos: model.combos }) as const);
-
-  return specs.length === count
-    ? [...specs]
-    : Array.from({ length: count }, () => ({ kind: 'random' }) as const);
-}
-
-/**
- * What a value bet is worth, assuming it is called.
- *
- * A deliberately conservative model: no fold equity, so bluffs are never
- * credited with the pot they might win uncontested. That makes the coach
- * under-value aggression rather than over-value it, and an under-valued raise
- * shows up as a marginal grade rather than a wrong one.
- */
-function valueBetEv(pot: number, equity: number): number {
-  const size = VALUE_BET_FRACTION * pot;
-
-  return size * (2 * equity - 1);
-}
-
-/** The bet or raise the coach would make, sized off the pot. */
-function raiseAction(state: HandState, seat: SeatIndex, pot: number, toCall: number): Action {
-  const player = playerAt(state, seat);
-  const to = Math.min(
-    player.committedThisStreet + toCall + Math.round(VALUE_BET_FRACTION * (pot + toCall)),
-    player.committedThisStreet + player.stack,
-  );
-
-  return state.currentBet === 0 ? { type: 'bet', to } : { type: 'raise', to };
-}
-
-function evOf(action: Action, evCall: number, evValueBet: number): number {
-  switch (action.type) {
-    case 'fold':
-    case 'check':
-      return 0;
-    case 'call':
-      return evCall;
-    case 'bet':
-    case 'raise':
-      return evValueBet;
-  }
 }
 
 function gradeFor(lossInBigBlinds: number): Grade {

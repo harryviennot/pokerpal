@@ -189,13 +189,24 @@ export {
   decisionPoints,
   reviewDecision,
   reviewHand,
-  type CoachOptions,
-  type DecisionFacts,
   type DecisionPoint,
   type DecisionReview,
   type Grade,
   type Leak,
 } from './coach';
+
+export {
+  factsFrom,
+  lineValue,
+  measureDecision,
+  opponentSpecs,
+  rankLines,
+  recommend,
+  type CoachOptions,
+  type DecisionFacts,
+  type Line,
+  type Recommendation,
+} from './recommend';
 
 export {
   bestDecision,
