@@ -151,6 +151,13 @@ export function fuseFrame(
 
   const handEnded = emptyStreak >= config.handEndFrames && board.length >= FLOP_SIZE;
 
+  // The steady state — locked board, nothing auditioning — keeps its array
+  // references, so store selectors over `board` and `candidates` see the same
+  // values frame after frame and React stays idle at 10 Hz.
+  if (candidates.length === 0 && state.candidates.length === 0) {
+    candidates = state.candidates as TrackedCandidate[];
+  }
+
   return { board, candidates, emptyStreak, handEnded };
 }
 
