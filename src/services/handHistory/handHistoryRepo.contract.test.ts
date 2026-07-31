@@ -79,6 +79,19 @@ function describeHandHistoryRepo(name: string, makeRepo: () => HandHistoryRepo):
       expect(second).not.toBe(first);
     });
 
+    it('carries the session origin onto its hands, defaulting to game', async () => {
+      const game = await repo.createSession(SESSION);
+      const live = await repo.createSession({ ...SESSION, origin: 'live' });
+
+      await repo.saveHand(hand(game));
+      await repo.saveHand(hand(live, { playedAt: 2_000 }));
+
+      const listed = await repo.listHands();
+
+      expect(listed.map((row) => row.origin)).toEqual(['live', 'game']);
+      expect((await repo.listSessionHands(live))[0]?.origin).toBe('live');
+    });
+
     it('stores a hand and lists it', async () => {
       const sessionId = await repo.createSession(SESSION);
 

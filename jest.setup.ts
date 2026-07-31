@@ -1,4 +1,5 @@
 import { installMemoryHandHistoryRepo } from '@/services/handHistory';
+import { installMemorySettingsRepo } from '@/services/settings';
 
 // React 19 only flushes updates inside act() when this flag is set. Without it
 // the renderer leaks state between tests as timer-driven updates land outside
@@ -9,6 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 // touches expo-sqlite (unavailable under Jest) or another test's writes.
 beforeEach(() => {
   installMemoryHandHistoryRepo();
+  installMemorySettingsRepo();
 });
 
 // Reanimated's JS-only test implementation: animations resolve synchronously
@@ -28,6 +30,25 @@ jest.mock('react-native-reanimated', () => {
   // comes out undefined.
   return { __esModule: true, ...actual, default: actual.default, useReducedMotion: () => true };
 });
+
+// The camera and TFLite are native modules with no Jest implementation. The
+// mocks keep the LivePlay tree mountable: no permission, no model — which is
+// exactly the path the screen falls back from, so tests exercise the real
+// fallback rather than a pretend camera.
+jest.mock('react-native-vision-camera', () => ({
+  Camera: () => null,
+  useCameraPermission: () => ({
+    hasPermission: false,
+    requestPermission: jest.fn().mockResolvedValue(false),
+  }),
+  useFrameOutput: () => ({}),
+}));
+
+jest.mock('react-native-fast-tflite', () => ({
+  loadTensorflowModel: jest
+    .fn()
+    .mockRejectedValue(new Error('No TFLite runtime under Jest; LivePlay falls back to demo.')),
+}));
 
 // `Screen` asks for the safe area insets, which throws without a provider above
 // it. The library ships this mock for exactly that; wrapping every screen test

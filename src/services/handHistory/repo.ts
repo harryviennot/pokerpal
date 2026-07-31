@@ -17,6 +17,9 @@ import {
 
 export type SessionId = number;
 
+/** Where a session's hands came from: the practice table or LivePlay's camera. */
+export type SessionOrigin = 'game' | 'live';
+
 export interface NewSessionRecord {
   /** Milliseconds since the epoch, supplied by the caller's clock. */
   startedAt: number;
@@ -24,6 +27,8 @@ export interface NewSessionRecord {
   seed: number;
   heroSeat: SeatIndex;
   blinds: Blinds;
+  /** Defaults to 'game', the only origin that existed before version 2. */
+  origin?: SessionOrigin;
 }
 
 export interface NewHandRecord {
@@ -53,6 +58,8 @@ export interface StoredHandSummary {
   decisionsGraded: number;
   /** Chips of expected value given up across the hand's graded decisions. */
   evLost: number;
+  /** From the hand's session; 'live' rows get a badge in the history list. */
+  origin: SessionOrigin;
 }
 
 export interface StoredHand extends StoredHandSummary {

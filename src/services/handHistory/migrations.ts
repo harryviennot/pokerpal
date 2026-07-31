@@ -48,6 +48,9 @@ export const MIGRATIONS: readonly (readonly string[])[] = [
       UNIQUE (hand_id, ordinal)
     )`,
   ],
+  // Version 2: where a session's hands came from — the practice table
+  // ('game') or LivePlay's camera ('live').
+  [`ALTER TABLE sessions ADD COLUMN origin TEXT NOT NULL DEFAULT 'game'`],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

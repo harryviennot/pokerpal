@@ -37,6 +37,7 @@ export function createMemoryHandHistoryRepo(): HandHistoryRepo {
     heroNet: hand.heroNet,
     decisionsGraded: hand.reviews.length,
     evLost: hand.reviews.reduce((sum, review) => sum + review.evLoss, 0),
+    origin: sessions.get(hand.sessionId)?.origin ?? 'game',
   });
 
   return {
