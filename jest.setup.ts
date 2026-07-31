@@ -1,4 +1,5 @@
 import { installMemoryHandHistoryRepo } from '@/services/handHistory';
+import { installMemorySettingsRepo } from '@/services/settings';
 
 // React 19 only flushes updates inside act() when this flag is set. Without it
 // the renderer leaks state between tests as timer-driven updates land outside
@@ -9,6 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 // touches expo-sqlite (unavailable under Jest) or another test's writes.
 beforeEach(() => {
   installMemoryHandHistoryRepo();
+  installMemorySettingsRepo();
 });
 
 // Reanimated's JS-only test implementation: animations resolve synchronously
