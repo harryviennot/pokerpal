@@ -32,6 +32,9 @@ interface FaceUp {
 /** The fewest hands worth comparing. One hand against nobody has no equity. */
 const MIN_HANDS = 2;
 
+/** A finished board has no equity left to show — the percentages are 100 and 0. */
+const FULL_BOARD = 5;
+
 /**
  * Per-seat equity for the frosted badges on an all-in run-out.
  *
@@ -40,12 +43,11 @@ const MIN_HANDS = 2;
  * scoreboard — and watching a pair hold at 28% is the most instructive thing a
  * losing all-in ever does.
  *
- * Returns null unless at least two hands are face up on a hand still in progress,
- * which is exactly when the reference shows the badges. Note that this engine
- * only turns hands over at showdown, so today the window opens as the hands are
- * revealed one at a time and closes when the pot is pushed; a run-out that turns
- * the hands over before the board completes will light the same badges up with no
- * change here.
+ * Returns null unless at least two hands are face up on a hand still in
+ * progress with the board unfinished. The engine tables the hands the moment a
+ * pre-river all-in closes the betting, so the window runs from that reveal
+ * until the river lands — at which point the race is over and a 100 next to a
+ * 0 is not a scoreboard, it is noise.
  */
 export function useRunoutEquity({
   snapshot,
@@ -53,7 +55,11 @@ export function useRunoutEquity({
 }: UseRunoutEquityInput): readonly (string | null)[] | null {
   const board = snapshot?.board ?? NO_CARDS;
   const hands = faceUpHands(snapshot, heroSeat);
-  const live = snapshot !== null && !snapshot.complete && hands.length >= MIN_HANDS;
+  const live =
+    snapshot !== null &&
+    !snapshot.complete &&
+    board.length < FULL_BOARD &&
+    hands.length >= MIN_HANDS;
   const key = live ? `${board.join(',')}|${hands.map(describe).join('|')}` : '';
 
   const requests = useMemo<readonly EquityRequest[] | null>(

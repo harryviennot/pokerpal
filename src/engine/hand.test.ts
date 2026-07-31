@@ -283,6 +283,68 @@ describe('all-in run-out', () => {
   });
 });
 
+describe('run-out reveals', () => {
+  it('tables every contesting hand before dealing the run-out', () => {
+    const state = dealHand(table([500, 500]), stackDeck(['Ah Ad', 'Kh Kd'], '2c 7d 9s 3h 4c'));
+
+    const done = play(state, [{ type: 'raise', to: 500 }, { type: 'call' }]);
+    const types = done.events.map((event) => event.type);
+
+    // Both hands come up, and they come up before any board card does.
+    expect(types.filter((type) => type === 'handRevealed')).toHaveLength(2);
+    expect(types.indexOf('handRevealed')).toBeLessThan(types.indexOf('streetDealt'));
+  });
+
+  it('never mucks a hand the run-out already tabled', () => {
+    const state = dealHand(table([500, 500]), stackDeck(['Ah Ad', 'Kh Kd'], '2c 7d 9s 3h 4c'));
+
+    const done = play(state, [{ type: 'raise', to: 500 }, { type: 'call' }]);
+    const types = done.events.map((event) => event.type);
+
+    expect(types).not.toContain('handMucked');
+    expect(types.filter((type) => type === 'showdownHand')).toHaveLength(2);
+  });
+
+  it('reveals the last aggressor first and skips folded seats', () => {
+    const state = dealHand(
+      table([1000, 120, 1000]),
+      stackDeck(['Ah Ad', 'Kh Kd', 'Qh Qd'], '2c 7d 9s 3h 4c'),
+    );
+
+    const done = play(state, [
+      { type: 'fold' }, // seat 0 folds the button
+      { type: 'raise', to: 120 }, // seat 1 shoves the small blind
+      { type: 'call' }, // seat 2 calls
+    ]);
+    const reveals = done.events.flatMap((event) =>
+      event.type === 'handRevealed' ? [event.seat] : [],
+    );
+
+    expect(reveals).toEqual([1, 2]);
+  });
+
+  it('leaves an ordinary river showdown alone: no reveals, mucking intact', () => {
+    // Checked down to the river; the first hand to show is the pair of aces,
+    // so the junk behind it mucks rather than showing for nothing.
+    const state = dealHand(table([1000, 1000]), stackDeck(['Ah Ad', '2c 3d'], 'Kh Qs Jd 9c 4s'));
+
+    const done = play(state, [
+      { type: 'call' },
+      { type: 'check' },
+      { type: 'check' },
+      { type: 'check' },
+      { type: 'check' },
+      { type: 'check' },
+      { type: 'check' },
+      { type: 'check' },
+    ]);
+    const types = done.events.map((event) => event.type);
+
+    expect(types).not.toContain('handRevealed');
+    expect(types).toContain('handMucked');
+  });
+});
+
 describe('startHand', () => {
   it('is deterministic for a seed', () => {
     const config = table([1000, 1000, 1000]);

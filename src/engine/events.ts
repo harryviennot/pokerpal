@@ -31,6 +31,13 @@ export type HandEvent =
   | { type: 'holeCardsDealt'; seat: SeatIndex; cards: readonly [Card, Card] }
   | { type: 'streetDealt'; street: Street; cards: readonly Card[]; burned: Card }
   | { type: 'actionTaken'; seat: SeatIndex; action: LoggedAction; allIn: boolean }
+  /**
+   * Betting closed before the river with nothing left to decide: every hand
+   * still contesting is turned face up before the board runs out, the way a
+   * real table does it. Rank comes later, from `showdownHand`, once the board
+   * it is ranked against exists.
+   */
+  | { type: 'handRevealed'; seat: SeatIndex; cards: readonly [Card, Card] }
   /** The excess of an unmatched bet, handed back before the pot is built. */
   | { type: 'uncalledBetReturned'; seat: SeatIndex; amount: number }
   /** `bestFive` is optional: hands archived before it existed replay without it. */
@@ -81,6 +88,8 @@ export function describeEvent(event: HandEvent, name: SeatNamer = numberedSeat):
       return `${name(event.seat)} ${describeAction(event.action)}${
         event.allIn ? ' and is all in' : ''
       }`;
+    case 'handRevealed':
+      return `${name(event.seat)} turns over ${event.cards.map(formatCard).join(' ')}`;
     case 'uncalledBetReturned':
       return `${event.amount} returned to ${name(event.seat)}`;
     case 'showdownHand':

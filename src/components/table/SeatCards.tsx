@@ -89,11 +89,11 @@ const SPREAD = 8;
 const LIFT = 4;
 
 /**
- * The hero's fan reacting to the clock: resting it sits in its ordinary spot
- * behind the plate; when the table turns to the hero it opens — each card
- * slides outward and the pair rises. The translate rides outside the fan's
- * own rotation, so opening never disturbs the lean. Instant under reduced
- * motion.
+ * The hero's fan reacting to the clock: resting it sits closed — each card
+ * tucked inward and the pair a touch lower; when the table turns to the hero
+ * it opens out to the fan's ordinary spot. The translate rides outside the
+ * fan's own rotation, so opening never disturbs the lean. Instant under
+ * reduced motion.
  */
 function useTurnLift(up: boolean) {
   const { reduceMotion } = useMotionPrefs();
@@ -106,10 +106,16 @@ function useTurnLift(up: boolean) {
   }, [up, reduceMotion, progress]);
 
   const first = useAnimatedStyle(() => ({
-    transform: [{ translateX: -SPREAD * progress.value }, { translateY: -LIFT * progress.value }],
+    transform: [
+      { translateX: SPREAD * (1 - progress.value) },
+      { translateY: LIFT * (1 - progress.value) },
+    ],
   }));
   const second = useAnimatedStyle(() => ({
-    transform: [{ translateX: SPREAD * progress.value }, { translateY: -LIFT * progress.value }],
+    transform: [
+      { translateX: -SPREAD * (1 - progress.value) },
+      { translateY: LIFT * (1 - progress.value) },
+    ],
   }));
 
   return { first, second };

@@ -21,7 +21,7 @@ import { createDeck, shuffle } from './deck';
 import { type HandEvent } from './events';
 import { buildPots, findUncalledBet, toContribution } from './pots';
 import { type Rng } from './rng';
-import { resolveShowdown } from './showdown';
+import { resolveShowdown, revealOrder } from './showdown';
 import {
   contestingPlayers,
   InvalidTableError,
@@ -111,7 +111,9 @@ function closeStreet(state: HandState): HandState {
   const runOut =
     settled.players.filter((player) => player.status === 'active' && player.stack > 0).length <= 1;
 
-  let next = dealStreet(settled);
+  // The hands come up before the board does, the way a real table runs it out —
+  // there is no information left to protect once nobody can bet.
+  let next = dealStreet(runOut ? revealHands(settled) : settled);
 
   while (runOut && next.street !== 'river') {
     next = dealStreet(next);
@@ -124,6 +126,29 @@ function closeStreet(state: HandState): HandState {
   return {
     ...next,
     toAct: nextSeat(next.players, next.button, (p) => p.status === 'active' && p.stack > 0),
+  };
+}
+
+/**
+ * Tables every contesting hand ahead of a run-out, last aggressor first.
+ *
+ * Only the cards: ranks wait for `showdownHand`, because a rank is a claim
+ * about a board that does not exist yet.
+ */
+function revealHands(state: HandState): HandState {
+  const contesting = contestingPlayers(state).filter((player) => player.holeCards !== null);
+  const order = revealOrder(contesting, state.players, firstToShow(state));
+
+  return {
+    ...state,
+    events: [
+      ...state.events,
+      ...order.map((player): HandEvent => ({
+        type: 'handRevealed',
+        seat: player.seat,
+        cards: player.holeCards as readonly [Card, Card],
+      })),
+    ],
   };
 }
 
@@ -180,6 +205,8 @@ function finish(state: HandState): HandState {
       settled.board,
       settled.button,
       firstToShow(settled),
+      // A hand tabled for the run-out has been seen; it cannot muck back.
+      new Set(settled.events.flatMap((event) => (event.type === 'handRevealed' ? event.seat : []))),
     );
 
     for (const entry of entries) {

@@ -213,6 +213,15 @@ function applyEvent(snapshot: TableSnapshot, event: HandEvent): TableSnapshot {
         bet: seat.bet - event.amount,
       }));
 
+    case 'handRevealed':
+      // Cards only — the rank arrives with `showdownHand`, once there is a
+      // full board to rank against.
+      return withSeat({ ...snapshot, actor: event.seat }, event.seat, (seat) => ({
+        ...seat,
+        holeCards: event.cards,
+        shown: true,
+      }));
+
     case 'showdownHand':
       return withSeat({ ...collectBets(snapshot), actor: event.seat }, event.seat, (seat) => ({
         ...seat,

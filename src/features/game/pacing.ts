@@ -64,6 +64,9 @@ const REVEAL_MS: Record<HandEvent['type'], number> = {
   holeCardsDealt: 120,
   streetDealt: 900,
   actionTaken: 250,
+  // A hand tabled for a run-out is a flip worth watching, but the rank plate
+  // and the reading it needs come later, at `showdownHand`.
+  handRevealed: 800,
   uncalledBetReturned: 400,
   // A revealed hand is information, not motion: each one needs long enough to
   // actually be read before the next reveal takes the eye.

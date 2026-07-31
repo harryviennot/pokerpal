@@ -41,6 +41,8 @@ export interface ShowdownResult {
  *
  * @param firstToShow the last aggressor, or the first seat left of the button
  *   when the street was checked through.
+ * @param alreadyShown seats whose hands were tabled during an all-in run-out;
+ *   a hand the table has already seen cannot be mucked back.
  */
 export function resolveShowdown(
   players: readonly Player[],
@@ -48,6 +50,7 @@ export function resolveShowdown(
   board: readonly Card[],
   button: SeatIndex,
   firstToShow: SeatIndex,
+  alreadyShown: ReadonlySet<SeatIndex> = NOBODY,
 ): ShowdownResult {
   const contesting = players.filter(
     (player) => (player.status === 'active' || player.status === 'allIn') && player.holeCards,
@@ -79,8 +82,13 @@ export function resolveShowdown(
     awards.push(...awardPot(pot, winners, potIndex, button, players.length));
   });
 
-  return { entries: buildEntries(contesting, ranked, fives, players, firstToShow), awards };
+  return {
+    entries: buildEntries(contesting, ranked, fives, players, firstToShow, alreadyShown),
+    awards,
+  };
 }
+
+const NOBODY: ReadonlySet<SeatIndex> = new Set();
 
 function rankValue(ranked: Map<SeatIndex, HandRank>, seat: SeatIndex): number {
   const rank = ranked.get(seat);
@@ -105,6 +113,7 @@ function buildEntries(
   fives: Map<SeatIndex, readonly Card[]>,
   players: readonly Player[],
   firstToShow: SeatIndex,
+  alreadyShown: ReadonlySet<SeatIndex>,
 ): ShowdownEntry[] {
   const order = revealOrder(contesting, players, firstToShow);
   const entries: ShowdownEntry[] = [];
@@ -112,7 +121,7 @@ function buildEntries(
 
   for (const player of order) {
     const rank = ranked.get(player.seat) as HandRank;
-    const mucked = rank.value < bestShown;
+    const mucked = rank.value < bestShown && !alreadyShown.has(player.seat);
 
     if (!mucked) {
       bestShown = rank.value;
@@ -131,7 +140,7 @@ function buildEntries(
 }
 
 /** Contesting players clockwise from `firstToShow`, starting with them. */
-function revealOrder(
+export function revealOrder(
   contesting: readonly Player[],
   players: readonly Player[],
   firstToShow: SeatIndex,

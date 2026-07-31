@@ -79,7 +79,16 @@ export function TableSeat({
         {beside ? <View style={styles.gap} /> : hand}
       </View>
 
-      {handLabel !== null && <HandRankPlate label={handLabel} width={width} />}
+      {revealed ? (
+        // The hero's plate slot is always reserved: when the label goes — a
+        // mucked loss at the end of a hand — the cards above would otherwise
+        // drop by its height the moment it left the layout.
+        <View style={handLabel === null ? styles.ghostPlate : null}>
+          <HandRankPlate label={handLabel ?? ' '} width={width} />
+        </View>
+      ) : (
+        handLabel !== null && <HandRankPlate label={handLabel} width={width} />
+      )}
 
       <SeatPill seat={seat} active={active} hero={revealed} actionLabel={actionLabel} />
 
@@ -124,6 +133,10 @@ const styles = StyleSheet.create({
   // plate does not jump up the felt at showdown.
   gap: {
     height: CARD_PEEK,
+  },
+  // Invisible but still in the layout, holding the hero's cards in place.
+  ghostPlate: {
+    opacity: 0,
   },
   // Level with the plate and just past its edge, overflowing the box the geometry
   // handed out — there is felt there, and nothing else wants it.
