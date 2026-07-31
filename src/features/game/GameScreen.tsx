@@ -15,6 +15,7 @@ import { DecisionClock } from './DecisionClock';
 import { TopBar } from './TopBar';
 import { type ActiveGame } from './types';
 import { useGameStore } from './useGameStore';
+import { useGuidedAdvice } from './useGuidedAdvice';
 import { useLiveEquity } from './useLiveEquity';
 import { useRunoutEquity } from './useRunoutEquity';
 import { useShownFrame } from './useShownFrame';
@@ -69,15 +70,24 @@ function Felt({ game }: { game: ActiveGame }) {
   const insets = useSafeAreaInsets();
   const act = useGameStore((state) => state.act);
   const setPreselect = useGameStore((state) => state.setPreselect);
+  const setGuided = useGameStore((state) => state.setGuided);
   const dismissAdvice = useGameStore((state) => state.dismissAdvice);
   const leave = useGameStore((state) => state.leave);
 
-  const { hand, heroSeat, phase, mode } = game;
+  const { hand, heroSeat, phase, mode, guided } = game;
   const frame = useShownFrame(game);
   const shown = frame?.snapshot ?? null;
 
   const runout = useRunoutEquity({ snapshot: shown, heroSeat });
-  const live = useLiveEquity({ snapshot: shown, heroSeat, enabled: mode === 'learning' });
+  // The equity strip is the read for a player being left to work it out. With
+  // the guide on it is switched off, because the guide says the same figure
+  // inside a sentence that also says what to do with it.
+  const live = useLiveEquity({
+    snapshot: shown,
+    heroSeat,
+    enabled: mode === 'learning' && !guided,
+  });
+  const guide = useGuidedAdvice({ hand, heroSeat, enabled: guided && phase === 'heroTurn' });
 
   if (!frame) {
     return null;
@@ -107,6 +117,8 @@ function Felt({ game }: { game: ActiveGame }) {
           mode={mode}
           startedAt={game.startedAt}
           levels={game.session.levels}
+          guided={guided}
+          onToggleGuided={setGuided}
           onLeave={leave}
         />
         <AdviceBanner
@@ -131,6 +143,7 @@ function Felt({ game }: { game: ActiveGame }) {
           phase={phase}
           preselect={game.preselect}
           hint={live.hint}
+          guide={guided ? guide : null}
           onAct={act}
           onPreselect={setPreselect}
         />

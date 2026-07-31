@@ -68,6 +68,18 @@ async function advanceUntil(reached: () => boolean, budgetMs = 60_000): Promise<
 
 const atPhase = (phase: GamePhase) => (): boolean => live().phase === phase;
 
+/**
+ * Lets the guide's chunked Monte Carlo finish.
+ *
+ * It samples on a zero-delay timer so the felt keeps painting between chunks;
+ * under fake timers that means the answer only lands once the clock is turned.
+ */
+async function settleGuide(): Promise<void> {
+  await act(async () => {
+    jest.advanceTimersByTime(1_000);
+  });
+}
+
 /** The hero as a calling station: never folds while there is a cheaper option. */
 function passive(hand: HandState): Action {
   const legal = legalActions(hand);
@@ -228,8 +240,8 @@ describe('GameScreen coaching', () => {
     expect(screen.queryByLabelText('Dismiss the coach')).not.toBeOnTheScreen();
   });
 
-  it('prices the hero hand against the pot while it plays, in learning mode', async () => {
-    read().start(setup(), SEED);
+  it('prices the hero hand against the pot while it plays, with the guide off', async () => {
+    read().start(setup({ guided: false }), SEED);
 
     await render(<GameScreen />);
     await advanceUntil(atPhase('heroTurn'));
@@ -239,6 +251,56 @@ describe('GameScreen coaching', () => {
     expect(screen.getByText(/^\d+% to win · \d+% to call$/)).toBeOnTheScreen();
     // ...and the same figure printed on the hero's own cards.
     expect(screen.getByText(/^\d+%$/)).toBeOnTheScreen();
+  });
+
+  it('replaces the equity strip with the guide when the guide is on', async () => {
+    read().start(setup(), SEED);
+
+    await render(<GameScreen />);
+    await advanceUntil(atPhase('heroTurn'));
+
+    // The Monte Carlo runs in chunks off the frame budget, so the card says it
+    // is thinking before it says anything else.
+    expect(screen.getByText('Working it out…')).toBeOnTheScreen();
+
+    await settleGuide();
+
+    // The guide carries the same figure inside a sentence that also says what
+    // to do with it, so two strips would be one readout too many.
+    expect(screen.getByText('THE COACH WOULD')).toBeOnTheScreen();
+    expect(screen.queryByText(/to win ·/)).not.toBeOnTheScreen();
+  });
+
+  it('takes the training wheels off mid-hand without ending the session', async () => {
+    const user = setupUser();
+
+    read().start(setup(), SEED);
+
+    await render(<GameScreen />);
+    await advanceUntil(atPhase('heroTurn'));
+    await settleGuide();
+
+    expect(screen.getByText('THE COACH WOULD')).toBeOnTheScreen();
+
+    await user.press(screen.getByLabelText('Guide me: on'));
+
+    expect(live().guided).toBe(false);
+    expect(screen.queryByText('THE COACH WOULD')).not.toBeOnTheScreen();
+    // Mid-hand, and the hand carries on: taking the wheels off is not a reset.
+    expect(live().hand.complete).toBe(false);
+  });
+
+  it('offers no guide at all in real mode', async () => {
+    read().start(setup({ mode: 'real', guided: true }), SEED);
+
+    await render(<GameScreen />);
+    await advanceUntil(atPhase('heroTurn'));
+    await settleGuide();
+
+    expect(live().guided).toBe(false);
+    expect(screen.queryByText('THE COACH WOULD')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Working it out…')).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText(/^Guide me/)).not.toBeOnTheScreen();
   });
 
   it('withholds the live read in real mode, where coaching waits for the summary', async () => {

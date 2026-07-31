@@ -25,6 +25,13 @@ export interface ConsoleButtonProps {
   /** What a screen reader hears. Defaults to the two lines read together. */
   label?: string;
   haptic?: ConsoleHaptic;
+  /**
+   * The move the guide is pointing at. Drawn as a ring rather than a different
+   * tone, so the committing row stays uniformly red — a recommended button that
+   * looked like a different kind of button would read as a different kind of
+   * action.
+   */
+  recommended?: boolean;
   disabled?: boolean;
   onPress: () => void;
   /** The caller owns the footprint: an action button is taller than a preset. */
@@ -45,6 +52,7 @@ export function ConsoleButton({
   tone = 'quiet',
   label,
   haptic = 'select',
+  recommended = false,
   disabled = false,
   onPress,
   style,
@@ -67,11 +75,13 @@ export function ConsoleButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label ?? (caption === null ? headline : `${headline} ${caption}`)}
+      accessibilityHint={recommended ? 'What the coach would do' : undefined}
       disabled={disabled}
       onPress={press}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: pressed ? skin.pressed : skin.background },
+        recommended && [styles.recommended, { borderColor: colors.onFelt }],
         style,
       ]}>
       <Text
@@ -151,5 +161,8 @@ const styles = StyleSheet.create({
   },
   faded: {
     opacity: 0.35,
+  },
+  recommended: {
+    borderWidth: 2,
   },
 });

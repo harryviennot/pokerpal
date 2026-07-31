@@ -18,9 +18,11 @@ import { radius, spacing } from '@/theme';
 
 import { ActionRow } from './ActionRow';
 import { betPresets, clampToBand, isRaise, type RaiseAction } from './betPresets';
+import { GuideCard } from './GuideCard';
 import { PreselectRow } from './PreselectRow';
 import { PresetStack } from './PresetStack';
 import { type GamePhase, type Preselect } from './types';
+import { type GuidedRead } from './useGuidedAdvice';
 
 export interface ActionConsoleProps {
   /** The live hand. The only source of what is legal — the console has no rules. */
@@ -32,6 +34,12 @@ export interface ActionConsoleProps {
   preselect: Preselect | null;
   /** One line of live context above the console. Learning mode's equity read. */
   hint?: string | null;
+  /**
+   * The coach's move, its size and its reasoning. When it is on it replaces the
+   * equity hint rather than stacking with it — the equity is inside the card,
+   * and two strips saying the same thing is the clutter the redesign removed.
+   */
+  guide?: GuidedRead | null;
   onAct: (action: Action) => void;
   onPreselect: (preselect: Preselect | null) => void;
 }
@@ -56,6 +64,7 @@ export function ActionConsole({
   phase,
   preselect,
   hint = null,
+  guide = null,
   onAct,
   onPreselect,
 }: ActionConsoleProps) {
@@ -63,13 +72,17 @@ export function ActionConsole({
   const yourTurn = phase === 'heroTurn' && !hand.complete && hand.toAct === heroSeat;
   const legal = yourTurn ? legalActions(hand) : NOTHING;
   const raise = legal.find(isRaise) ?? null;
-  const [betTo, setBetTo] = useBetSizing(hand.events.length, raise);
+  const best = guide?.recommendation?.best ?? null;
+  const suggestedTo = best?.type === 'bet' || best?.type === 'raise' ? best.to : null;
+  const [betTo, setBetTo] = useBetSizing(hand.events.length, raise, suggestedTo);
   const toCall = snapshotToCall(snapshot, heroSeat);
   const stack = hero?.stack ?? 0;
 
   return (
     <View style={styles.console} pointerEvents="box-none">
-      {hint !== null && <Hint label={hint} />}
+      {/* `GuideCard` renders nothing when there is nothing to say, so the guide
+          being on is enough to decide which of the two strips the console gets. */}
+      {guide !== null ? <GuideCard guide={guide} /> : hint !== null && <Hint label={hint} />}
 
       {raise && (
         <PresetStack
@@ -91,7 +104,13 @@ export function ActionConsole({
       )}
 
       {yourTurn ? (
-        <ActionRow legal={legal} betTo={betTo} stack={stack} onAct={onAct} />
+        <ActionRow
+          legal={legal}
+          betTo={betTo}
+          stack={stack}
+          recommended={best?.type ?? null}
+          onAct={onAct}
+        />
       ) : (
         canArm(hand, heroSeat, phase) && (
           <PreselectRow
@@ -132,18 +151,30 @@ function canArm(hand: HandState, heroSeat: SeatIndex, phase: GamePhase): boolean
  * left at all-in must not become the default on the next street. Deriving the value
  * from that key rather than resetting it in an effect is what keeps it legal on
  * every render, including the one where the band moved under it.
+ *
+ * `suggested` is the guide's size, and it only ever supplies the *opening*
+ * value: the moment the player moves the sizer themselves their number wins,
+ * including on the render where the advice arrives late. A guide that dragged
+ * the slider back under a thumb would be worse than no guide.
  */
-function useBetSizing(decision: number, raise: RaiseAction | null): [number, (to: number) => void] {
+function useBetSizing(
+  decision: number,
+  raise: RaiseAction | null,
+  suggested: number | null,
+): [number, (to: number) => void] {
   const [sizing, setSizing] = useState<{ decision: number; to: number } | null>(null);
 
   if (!raise) {
     return [0, () => undefined];
   }
 
-  const to =
-    sizing?.decision === decision ? clampToBand(sizing.to, raise.min, raise.max) : raise.min;
+  const opening = suggested ?? raise.min;
+  const to = sizing?.decision === decision ? clampToBand(sizing.to, raise.min, raise.max) : opening;
 
-  return [to, (next: number) => setSizing({ decision, to: next })];
+  return [
+    clampToBand(to, raise.min, raise.max),
+    (next: number) => setSizing({ decision, to: next }),
+  ];
 }
 
 /** The live equity read, on a frosted strip so it is legible over the felt. */

@@ -72,6 +72,15 @@ export interface SessionSummaryData {
 export interface ActiveGame {
   /** Chosen at the lobby and fixed for the session: switching mid-session would rewrite history. */
   mode: GameMode;
+  /**
+   * Whether the guide is showing its move before the hero acts.
+   *
+   * Unlike `mode`, this one moves: the whole point of training wheels is being
+   * able to take them off, and doing so mid-session changes nothing that was
+   * already recorded. Forced false in real mode, at `start`, so no screen can
+   * leak advice into a game that is meant to be played cold.
+   */
+  guided: boolean;
   /** The engine's session: stacks, blind level, hands played. */
   session: SessionState;
   /** The engine's current hand. The single source of truth for what is legal. */
@@ -120,6 +129,8 @@ export interface GameState {
   /** The hero acts. Illegal actions are the store's problem to reject, not the screen's. */
   act(action: Action): void;
   setPreselect(p: Preselect | null): void;
+  /** Takes the training wheels off, or puts them back on, without ending the session. */
+  setGuided(guided: boolean): void;
   dismissAdvice(): void;
   /** Ends the session and clears `game`. */
   leave(): void;

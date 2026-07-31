@@ -12,6 +12,7 @@ import {
 } from '@/engine';
 
 import { ActionConsole } from './ActionConsole';
+import { type GuidedRead } from './useGuidedAdvice';
 
 /** The seed only decides the cards, and nothing here depends on them. */
 const SEED = 20260729;
@@ -87,6 +88,29 @@ const setupUser = () => userEvent.setup({ advanceTimers: jest.advanceTimersByTim
 const pending = (): string =>
   screen.getByLabelText(/^(Raise|Bet) (\d|All-in)/).props.accessibilityLabel;
 
+/** A settled guide pointing at one move, with the facts the card reads from. */
+function guiding(best: Action, spot: Spot): GuidedRead {
+  return {
+    pending: false,
+    recommendation: {
+      seat: HERO,
+      best,
+      lines: [{ action: best, ev: 1 }],
+      facts: {
+        street: spot.hand.street,
+        playersBehind: 1,
+        pot: 50,
+        toCall: 20,
+        stack: 480,
+        spr: 9.6,
+        equity: 0.62,
+        requiredEquity: 0.29,
+        outs: 0,
+      },
+    },
+  };
+}
+
 beforeEach(() => {
   jest.useFakeTimers();
 });
@@ -96,6 +120,113 @@ afterEach(async () => {
   jest.clearAllTimers();
   jest.useRealTimers();
 });
+
+describe('ActionConsole with the guide on', () => {
+  it('rings the button the coach is pointing at, and only that one', async () => {
+    await render(
+      <ActionConsole
+        {...PREFLOP}
+        heroSeat={HERO}
+        phase="heroTurn"
+        preselect={null}
+        guide={guiding({ type: 'fold' }, PREFLOP)}
+        {...handlers()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Fold').props.accessibilityHint).toBe('What the coach would do');
+    expect(screen.getByLabelText('Call 20').props.accessibilityHint).toBeUndefined();
+  });
+
+  it('opens the raise at the size the coach chose, not the minimum', async () => {
+    await render(
+      <ActionConsole
+        {...PREFLOP}
+        heroSeat={HERO}
+        phase="heroTurn"
+        preselect={null}
+        guide={guiding({ type: 'raise', to: 90 }, PREFLOP)}
+        {...handlers()}
+      />,
+    );
+
+    // The rules would have opened it at 40.
+    expect(pending()).toBe('Raise 90');
+  });
+
+  it('keeps a size the player chose, even after the advice arrives', async () => {
+    const user = setupUser();
+    const props = {
+      ...PREFLOP,
+      heroSeat: HERO,
+      phase: 'heroTurn' as const,
+      preselect: null,
+      ...handlers(),
+    };
+    const { rerender } = await render(<ActionConsole {...props} guide={WORKING} />);
+
+    await user.press(screen.getByLabelText('Raise the size by one big blind'));
+
+    const chosen = pending();
+
+    await rerender(
+      <ActionConsole {...props} guide={guiding({ type: 'raise', to: 90 }, PREFLOP)} />,
+    );
+
+    // A guide that dragged the slider back under a thumb would be worse than
+    // no guide at all.
+    expect(pending()).toBe(chosen);
+  });
+
+  it('clamps a suggestion the rules will not take', async () => {
+    await render(
+      <ActionConsole
+        {...PREFLOP}
+        heroSeat={HERO}
+        phase="heroTurn"
+        preselect={null}
+        guide={guiding({ type: 'raise', to: 10_000 }, PREFLOP)}
+        {...handlers()}
+      />,
+    );
+
+    expect(pending()).toBe('Raise All-in');
+  });
+
+  it('says it is thinking rather than showing a stale move', async () => {
+    await render(
+      <ActionConsole
+        {...PREFLOP}
+        heroSeat={HERO}
+        phase="heroTurn"
+        preselect={null}
+        guide={WORKING}
+        {...handlers()}
+      />,
+    );
+
+    expect(screen.getByText('Working it out…')).toBeOnTheScreen();
+    expect(screen.queryByText('THE COACH WOULD')).not.toBeOnTheScreen();
+  });
+
+  it('shows the equity strip instead when there is no guide', async () => {
+    await render(
+      <ActionConsole
+        {...PREFLOP}
+        heroSeat={HERO}
+        phase="heroTurn"
+        preselect={null}
+        hint="62% to win · 29% to call"
+        {...handlers()}
+      />,
+    );
+
+    expect(screen.getByText('62% to win · 29% to call')).toBeOnTheScreen();
+    expect(screen.queryByText('THE COACH WOULD')).not.toBeOnTheScreen();
+  });
+});
+
+const WORKING: GuidedRead = { recommendation: null, pending: true };
 
 describe('ActionConsole on the hero turn', () => {
   it('offers exactly the actions the rules offer, and nothing else', async () => {

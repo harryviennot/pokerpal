@@ -103,6 +103,9 @@ export const useGameStore = create<GameState>((set, get) => {
         setup,
         game: {
           mode: setup.mode,
+          // Real mode never guides, whatever the lobby's draft says. One place
+          // decides it, so no screen downstream has to remember the rule.
+          guided: setup.mode === 'learning' && setup.guided,
           session: dealt.session,
           hand: dealt.hand,
           handSeats: seatsOf(dealt.session),
@@ -150,6 +153,8 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     setPreselect: (preselect) => patch({ preselect }),
+
+    setGuided: (guided) => patch({ guided: get().game?.mode === 'learning' && guided }),
 
     dismissAdvice: () => patch({ advice: null }),
 

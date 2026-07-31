@@ -81,6 +81,8 @@ export function TableSetupForm({ draft, onChange }: TableSetupFormProps) {
         <Rebuys draft={draft} onChange={onChange} />
       </Section>
 
+      <Guide draft={draft} onChange={onChange} />
+
       <Section title="The table">
         {seatsFor(draft)
           .slice(1)
@@ -89,6 +91,35 @@ export function TableSetupForm({ draft, onChange }: TableSetupFormProps) {
           ))}
       </Section>
     </>
+  );
+}
+
+/**
+ * Whether the coach shows its move before you make yours.
+ *
+ * Learning only, and sayable at the table too — this is the first tap, not the
+ * only one, which is why the copy points at the control on the felt.
+ */
+function Guide({ draft, onChange }: TableSetupFormProps) {
+  if (draft.mode === 'real') {
+    return null;
+  }
+
+  return (
+    <Section title="The coach">
+      <Host style={styles.switch}>
+        <Switch
+          value={draft.guided}
+          label="Guide me while I play"
+          onValueChange={(value) => onChange({ guided: value })}
+        />
+      </Host>
+      <Text variant="footnote" tone="secondaryLabel">
+        {draft.guided
+          ? 'Before every decision the coach names the move, the size and why. Turn it off at the table whenever you want to try it yourself.'
+          : 'You decide on your own. The coach still grades every hand once it is over.'}
+      </Text>
+    </Section>
   );
 }
 

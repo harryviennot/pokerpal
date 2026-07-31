@@ -34,7 +34,7 @@ const MODES: readonly ModeCopy[] = [
     pitch: 'Sit and think. The coach is next to you the whole way.',
     points: [
       'No clock — take as long as you like on every decision',
-      'Your equity and the pot odds, live, while you decide',
+      'Optional guide: the move to make, the size, and why, before you act',
       'The coach grades the hand as soon as it is over',
     ],
   },
@@ -44,7 +44,7 @@ const MODES: readonly ModeCopy[] = [
     pitch: 'Play it like it counts, and read the report afterwards.',
     points: [
       `${CLOCK_SECONDS} seconds to act, or the clock checks or folds for you`,
-      'No equity, no pot odds — just the table',
+      'No guide, no equity, no pot odds — just the table',
       `Blinds climb every ${LEVEL_MINUTES} minutes, and the report comes at the end`,
     ],
   },

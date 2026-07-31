@@ -85,10 +85,16 @@ export interface TableSetup {
   style: TableStyle;
   /** Cash only: buy a busted seat back in rather than letting it go dark. */
   rebuys: boolean;
+  /**
+   * Learning only: show the coach's move, its size and its reasoning before you
+   * act. Not a rules concern, so `toSessionConfig` ignores it — the engine deals
+   * the same hand whether or not anyone is being told what to do with it.
+   */
+  guided: boolean;
 }
 
 /**
- * Six-handed, 5/10, mixed, rebuys on.
+ * Six-handed, 5/10, mixed, rebuys on, guided.
  *
  * A cash game that never ends is the right default for practice: the player
  * leaves when they want to, not when they bust.
@@ -100,6 +106,10 @@ export const DEFAULT_SETUP: TableSetup = {
   blinds: { smallBlind: 5, bigBlind: 10 },
   style: 'cash',
   rebuys: true,
+  // On by default. A first session where nobody tells you what to do is a
+  // session spent guessing, and the training wheels come off with one tap at
+  // the table the moment they are not wanted.
+  guided: true,
 };
 
 /** The lobby's choice, plus the mode it chose. What starts a game. */

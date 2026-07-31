@@ -18,6 +18,9 @@ export interface TopBarProps {
   startedAt: number;
   /** The blind ladder. A single level means there is nothing to count down to. */
   levels: readonly BlindLevel[];
+  /** Whether the guide is showing its move. Learning mode only. */
+  guided: boolean;
+  onToggleGuided: (guided: boolean) => void;
   onLeave: () => void;
 }
 
@@ -33,7 +36,7 @@ export interface TopBarProps {
  * equivalent of checking your balance is checking what the coach made of the last
  * few hands, and a session with no way into that is a session with no coaching.
  */
-export function TopBar({ mode, startedAt, levels, onLeave }: TopBarProps) {
+export function TopBar({ mode, startedAt, levels, guided, onToggleGuided, onLeave }: TopBarProps) {
   const { colors } = useTheme();
   const now = useNow();
   const next = nextLevel(levels, now - startedAt);
@@ -71,6 +74,23 @@ export function TopBar({ mode, startedAt, levels, onLeave }: TopBarProps) {
         </View>
 
         <View style={styles.spacer} />
+
+        {/* Learning only: the training wheels have to be removable without
+            ending the session, which is the whole reason the guide is a toggle
+            and not a third mode. */}
+        {mode === 'learning' && (
+          <CircleButton
+            glyph="💡"
+            role="switch"
+            checked={guided}
+            label={guided ? 'Guide me: on' : 'Guide me: off'}
+            hint={
+              guided ? 'Stops showing what the coach would do' : 'Shows what the coach would do'
+            }
+            dimmed={!guided}
+            onPress={() => onToggleGuided(!guided)}
+          />
+        )}
 
         <CircleButton
           glyph="☰"
@@ -115,21 +135,37 @@ function nextLevel(
 interface CircleButtonProps {
   glyph: string;
   label: string;
+  hint?: string;
+  role?: 'button' | 'switch';
+  checked?: boolean;
+  /** An off state, drawn faint rather than hidden so the control stays findable. */
+  dimmed?: boolean;
   onPress: () => void;
 }
 
 /** A round control on the backdrop, outlined rather than filled, as the reference has it. */
-function CircleButton({ glyph, label, onPress }: CircleButtonProps) {
+function CircleButton({
+  glyph,
+  label,
+  hint,
+  role = 'button',
+  checked,
+  dimmed = false,
+  onPress,
+}: CircleButtonProps) {
   const { colors } = useTheme();
 
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={role}
       accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={role === 'switch' ? { checked: checked ?? false } : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         styles.circle,
         { borderColor: colors.onFelt },
+        dimmed && styles.dimmed,
         pressed && styles.pressed,
       ]}>
       <Text variant="title3" style={[styles.glyph, { color: colors.onFelt }]}>
@@ -185,5 +221,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
+  },
+  dimmed: {
+    opacity: 0.45,
   },
 });

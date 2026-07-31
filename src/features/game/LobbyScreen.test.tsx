@@ -49,7 +49,7 @@ describe('LobbyScreen', () => {
     expect(screen.getByLabelText('Real game')).toBeOnTheScreen();
     expect(screen.getByText(/take as long as you like/i)).toBeOnTheScreen();
     expect(screen.getByText(/20 seconds to act/)).toBeOnTheScreen();
-    expect(screen.getByText(/No equity, no pot odds/)).toBeOnTheScreen();
+    expect(screen.getByText(/No guide, no equity, no pot odds/)).toBeOnTheScreen();
   });
 
   it('starts in learning mode, which is the store default', async () => {

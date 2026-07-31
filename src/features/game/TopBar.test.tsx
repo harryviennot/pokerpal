@@ -39,6 +39,8 @@ describe('TopBar', () => {
         mode="learning"
         startedAt={startedAt(9_514_000)}
         levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
         onLeave={jest.fn()}
       />,
     );
@@ -50,7 +52,14 @@ describe('TopBar', () => {
     const user = setupUser();
 
     await render(
-      <TopBar mode="learning" startedAt={startedAt()} levels={LEVELS} onLeave={jest.fn()} />,
+      <TopBar
+        mode="learning"
+        startedAt={startedAt()}
+        levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
+        onLeave={jest.fn()}
+      />,
     );
     await user.press(screen.getByLabelText('Review this session'));
 
@@ -59,7 +68,14 @@ describe('TopBar', () => {
 
   it('counts down to the blinds coming next, in real mode only', async () => {
     const { rerender } = await render(
-      <TopBar mode="real" startedAt={startedAt(125_000)} levels={LEVELS} onLeave={jest.fn()} />,
+      <TopBar
+        mode="real"
+        startedAt={startedAt(125_000)}
+        levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
+        onLeave={jest.fn()}
+      />,
     );
 
     // Fifty-five seconds of a three-minute level left, and the stakes that arrive
@@ -69,7 +85,14 @@ describe('TopBar', () => {
     expect(screen.queryByText('10 - 20')).not.toBeOnTheScreen();
 
     await rerender(
-      <TopBar mode="learning" startedAt={startedAt(125_000)} levels={LEVELS} onLeave={jest.fn()} />,
+      <TopBar
+        mode="learning"
+        startedAt={startedAt(125_000)}
+        levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
+        onLeave={jest.fn()}
+      />,
     );
 
     // Learning stays at one level forever, so there is nothing to count down to.
@@ -82,6 +105,8 @@ describe('TopBar', () => {
         mode="real"
         startedAt={startedAt(LEVEL_LENGTH_MS * 5)}
         levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
         onLeave={jest.fn()}
       />,
     );
@@ -97,7 +122,14 @@ describe('TopBar', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 
     await render(
-      <TopBar mode="learning" startedAt={startedAt()} levels={LEVELS} onLeave={onLeave} />,
+      <TopBar
+        mode="learning"
+        startedAt={startedAt()}
+        levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
+        onLeave={onLeave}
+      />,
     );
     await user.press(screen.getByLabelText('Leave the table'));
 
@@ -110,7 +142,16 @@ describe('TopBar', () => {
     const onLeave = jest.fn();
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 
-    await render(<TopBar mode="real" startedAt={startedAt()} levels={LEVELS} onLeave={onLeave} />);
+    await render(
+      <TopBar
+        mode="real"
+        startedAt={startedAt()}
+        levels={LEVELS}
+        guided
+        onToggleGuided={jest.fn()}
+        onLeave={onLeave}
+      />,
+    );
     await user.press(screen.getByLabelText('Leave the table'));
 
     expect(onLeave).not.toHaveBeenCalled();
