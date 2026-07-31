@@ -10,7 +10,7 @@
 import { rankIndexOf, suitIndexOf, suitOf, type Card } from '@/engine';
 
 import { type Rect } from './geometry';
-import { makeTemplate, type GlyphTemplates } from './templates';
+import { makeCroppedTemplate, type GlyphTemplates } from './templates';
 
 const RANK_MASK_W = 16;
 const RANK_MASK_H = 20;
@@ -30,25 +30,36 @@ const CARD_WHITE_DARK: readonly [number, number, number] = [245, 245, 247];
 const CARD_DIM: readonly [number, number, number] = [198, 201, 207];
 const FELT_BLUE: readonly [number, number, number] = [30, 64, 180];
 
-/** A coarse on/off block pattern, distinct per seed, never all-on or all-off. */
-function blockMask(
-  seed: number,
-  w: number,
-  h: number,
-  blocksX: number,
-  blocksY: number,
-): Float32Array {
-  const data = new Float32Array(w * h);
-  // A cheap deterministic hash of the seed, spread across the block bits.
-  const bits = (Math.imul(seed + 1, 2654435761) ^ 0x9e3779b9) >>> 0;
-  const bw = w / blocksX;
-  const bh = h / blocksY;
+/**
+ * A distinct glyph mask on a coarse block grid.
+ *
+ * Two properties matter, and both are constructed rather than hoped for.
+ * First, the four extreme corner blocks are always on, so the ink always spans
+ * the full extent: a tight crop of this mask and a tight crop of the same mask
+ * painted and read back at another scale cover the same region. Without that
+ * anchoring the two crops differ and the correlation collapses. Second, the
+ * interior blocks spell `index × 0x5B`, an odd multiplier that keeps every
+ * index distinct and neighbours several bits apart — so no two glyphs are a
+ * near-tie the way a hash's collisions would be.
+ */
+const SPREAD = 0x5b;
 
-  for (let by = 0; by < blocksY; by++) {
-    for (let bx = 0; bx < blocksX; bx++) {
-      const index = by * blocksX + bx;
-      // Force the first block on and the last off so no glyph is degenerate.
-      const on = index === 0 ? 1 : index === blocksX * blocksY - 1 ? 0 : (bits >> (index % 31)) & 1;
+function blockMask(index: number, w: number, h: number, bxN: number, byN: number): Float32Array {
+  const data = new Float32Array(w * h);
+  const bw = w / bxN;
+  const bh = h / byN;
+  const code = Math.imul(index, SPREAD) >>> 0;
+  let interior = 0;
+
+  for (let by = 0; by < byN; by++) {
+    for (let bx = 0; bx < bxN; bx++) {
+      const corner = (bx === 0 || bx === bxN - 1) && (by === 0 || by === byN - 1);
+      let on = 1;
+
+      if (!corner) {
+        on = (code >>> interior) & 1;
+        interior += 1;
+      }
 
       if (!on) {
         continue;
@@ -67,7 +78,7 @@ function blockMask(
 
 export function fakeRankMask(rankIndex: number): { data: Float32Array; w: number; h: number } {
   return {
-    data: blockMask(rankIndex, RANK_MASK_W, RANK_MASK_H, 4, 5),
+    data: blockMask(rankIndex + 1, RANK_MASK_W, RANK_MASK_H, 3, 4),
     w: RANK_MASK_W,
     h: RANK_MASK_H,
   };
@@ -75,7 +86,7 @@ export function fakeRankMask(rankIndex: number): { data: Float32Array; w: number
 
 export function fakeSuitMask(suitIndex: number): { data: Float32Array; w: number; h: number } {
   return {
-    data: blockMask(suitIndex + 100, SUIT_MASK_W, SUIT_MASK_H, 3, 3),
+    data: blockMask(suitIndex + 1, SUIT_MASK_W, SUIT_MASK_H, 3, 3),
     w: SUIT_MASK_W,
     h: SUIT_MASK_H,
   };
@@ -86,12 +97,12 @@ export function fakeTemplates(): GlyphTemplates {
   const ranks = Array.from({ length: 13 }, (_, i) => {
     const m = fakeRankMask(i);
 
-    return makeTemplate(m.data, m.w, m.h, RANK_MASK_W, RANK_MASK_H);
+    return makeCroppedTemplate(m.data, m.w, m.h, RANK_MASK_W, RANK_MASK_H);
   });
   const suits = Array.from({ length: 4 }, (_, i) => {
     const m = fakeSuitMask(i);
 
-    return makeTemplate(m.data, m.w, m.h, SUIT_MASK_W, SUIT_MASK_H);
+    return makeCroppedTemplate(m.data, m.w, m.h, SUIT_MASK_W, SUIT_MASK_H);
   });
 
   return {

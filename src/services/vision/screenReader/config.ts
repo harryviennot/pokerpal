@@ -44,9 +44,22 @@ export interface ScreenReaderConfig {
   /** Board members share a y-centre within this fraction of a card height. */
   rowYTolerance: number;
 
-  /** Rank read window, as fractions of the card bbox (top-left corner). */
+  /**
+   * The corner read windows, as fractions of the card bbox. The renderer puts
+   * the rank at the top-left and the small suit pip directly beneath it, so
+   * the split is positional — far steadier than trying to tell the two glyphs
+   * apart by the gap between them, which either can contain internally.
+   */
   rankWinW: number;
+  /** Rank occupies the card's top `rankWinH` of height. */
   rankWinH: number;
+  /** The pip sits between these fractions of card height. */
+  pipTop: number;
+  pipBottom: number;
+  /** Ink test: a pixel darker than this luma reads as glyph, not card. */
+  inkLuma: number;
+  /** Suit-colour tiebreak: ink darker than this is a dark suit (♠♣), not ♥/♦. */
+  suitDarkLuma: number;
 
   /** Canonical template sizes, in cells. */
   rankTplW: number;
@@ -84,7 +97,11 @@ export const DEFAULT_SCREEN_READER: ScreenReaderConfig = {
   rowYTolerance: 0.45,
 
   rankWinW: 0.6,
-  rankWinH: 0.55,
+  rankWinH: 0.39,
+  pipTop: 0.39,
+  pipBottom: 0.68,
+  inkLuma: 120,
+  suitDarkLuma: 80,
 
   rankTplW: 16,
   rankTplH: 20,

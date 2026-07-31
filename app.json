@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.harryviennot.pokerpal",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "PokerPal uses the camera to read the board cards in front of you during LivePlay."
+        "NSCameraUsageDescription": "PokerPal uses the camera so LivePlay can read the poker table you point it at."
       }
     },
     "android": {
@@ -43,13 +43,7 @@
           }
         }
       ],
-      "expo-sqlite",
-      [
-        "react-native-fast-tflite",
-        {
-          "enableCoreMLDelegate": true
-        }
-      ]
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

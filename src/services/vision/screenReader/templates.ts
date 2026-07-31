@@ -124,6 +124,52 @@ export function ncc(a: Float32Array, b: Float32Array): number {
   return sum / n;
 }
 
+/**
+ * Crop a patch to the bounding box of its ink (cells above `threshold`), so a
+ * template and an extracted glyph are scaled from the same extent — the reader
+ * tight-crops what it reads, so the templates must be tight too.
+ */
+export function tightCrop(
+  src: Float32Array,
+  w: number,
+  h: number,
+  threshold = 0.5,
+): { data: Float32Array; w: number; h: number } {
+  'worklet';
+
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if ((src[y * w + x] ?? 0) > threshold) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX) {
+    return { data: src, w, h };
+  }
+
+  const cw = maxX - minX + 1;
+  const ch = maxY - minY + 1;
+  const data = new Float32Array(cw * ch);
+
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      data[y * cw + x] = src[(minY + y) * w + (minX + x)] ?? 0;
+    }
+  }
+
+  return { data, w: cw, h: ch };
+}
+
 /** Resample a raw patch to the canonical size and normalize it — one template. */
 export function makeTemplate(
   src: Float32Array,
@@ -135,4 +181,19 @@ export function makeTemplate(
   'worklet';
 
   return normalizePatch(resampleBilinear(src, sw, sh, tw, th));
+}
+
+/** Tight-crop, resample to the canonical size, and normalize — one template. */
+export function makeCroppedTemplate(
+  src: Float32Array,
+  w: number,
+  h: number,
+  tw: number,
+  th: number,
+): Float32Array {
+  'worklet';
+
+  const cropped = tightCrop(src, w, h);
+
+  return makeTemplate(cropped.data, cropped.w, cropped.h, tw, th);
 }
