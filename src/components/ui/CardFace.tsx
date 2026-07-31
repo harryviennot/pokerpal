@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   pip: {
     position: 'absolute',
     bottom: 0,
-    
+
     right: spacing.xs,
     textAlign: 'center',
   },
