@@ -110,21 +110,28 @@ export interface ColorTokens {
 
   /** A seat waiting its turn. */
   pillDark: string;
+  /** Border colour for `pillDark`. */
+  pillDarkBorder: string;
   /** Text on `pillDark`. */
   onPillDark: string;
   /** The seat on the clock: inverted, so the eye finds it without an animation. */
   pillLight: string;
+  /** Border colour for `pillLight`. */
+  pillLightBorder: string;
   /** Text on `pillLight`. */
   onPillLight: string;
-  /** A seat that folded. Grey rather than transparent, so the stack stays legible. */
-  pillFolded: string;
-
+  /** Text on `pillFolded`. */
+  onPillFolded: string;
+  /** Border colour for `pillFolded`. */
+  pillFoldedBorder: string;
   /** The hero's own name plate. */
   platePlain: string;
   /** The hero's plate when they won the pot. */
   plateGold: string;
   /** Gold border that makes `plateGold` read as a win at a glance. */
   plateGoldBorder: string;
+  /** Border colour for `plateGold`. */
+  plateGoldExtraBorder: string;
 
   /** Diamonds in the four-color deck. Clubs stay green-free: only diamonds recolor. */
   suitOrange: string;
@@ -161,14 +168,16 @@ const arena = {
   consoleGrayPressed: '#363948',
   onConsoleGray: '#FFFFFF',
   consoleDisabled: '#30333D',
-  pillDark: '#161A2E',
+  pillDark: '#151A30',
+  pillDarkBorder: '#050513',
   onPillDark: '#FFFFFF',
-  pillLight: '#EEEFF3',
+  pillLight: '#EEF0F1',
   onPillLight: '#050512',
-  pillFolded: '#6A6E7A',
+  pillLightBorder: '#ABB9CC',
+  onPillFolded: '#8B8D98',
   platePlain: '#EEF0F1',
-  plateGold: '#E6E8EC',
-  plateGoldBorder: '#E4C112',
+  plateGold: '#EEF0F1',
+  plateGoldBorder: '#EABE00',
   suitOrange: '#ED3E12',
   cardBackRed: '#EF4463',
   cardBackRedDeep: '#8B2244',

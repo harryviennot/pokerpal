@@ -48,11 +48,12 @@ export function SeatPill({ seat, active, hero = false, actionLabel = null }: Sea
       <Animated.View
         style={[
           styles.pill,
-          { width: hero ? HERO_SEAT_WIDTH : SEAT_WIDTH, backgroundColor: tone.background },
+          { width: hero ? HERO_SEAT_WIDTH : SEAT_WIDTH, backgroundColor: tone.backgroundBorder },
           won && [styles.winner, { borderColor: colors.plateGoldBorder }],
           won && { shadowColor: colors.winnerGlow },
           glow,
         ]}>
+        <View style={[styles.pillInside, { backgroundColor: tone.background }]}>
         <Text
           variant="footnote"
           numberOfLines={1}
@@ -68,9 +69,10 @@ export function SeatPill({ seat, active, hero = false, actionLabel = null }: Sea
           variant="title3"
           tabular
           numberOfLines={1}
-          style={[styles.stack, tone.state === 'folded' && styles.faded, { color: tone.ink }]}>
+          style={[styles.stack, tone.state === 'folded' && styles.faded, { color: tone.ink }, hero && {fontSize: 18}]}>
           {stackLine(seat)}
         </Text>
+        </View>
       </Animated.View>
     </View>
   );
@@ -99,10 +101,18 @@ const styles = StyleSheet.create({
     minHeight: PILL_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
+    padding: 1.5,
+    paddingBottom: spacing.xs,
     borderRadius: radius.sm,
-    borderWidth: 2,
-    borderColor: 'transparent',
+  },
+  pillInside: {
+    borderRadius: radius.sm - 1.5,
+    paddingHorizontal: spacing.sm,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   winner: {
     shadowRadius: 8,
@@ -119,6 +129,7 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   verb: {
+    fontSize: 14,
     fontStyle: 'italic',
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -126,7 +137,8 @@ const styles = StyleSheet.create({
   },
   stack: {
     fontWeight: '800',
-    marginTop: -spacing.xs / 2,
+    fontSize: 16,
+    marginTop: -spacing.xs,
   },
   faded: {
     opacity: 0.7,

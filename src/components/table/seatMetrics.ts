@@ -11,10 +11,10 @@
  */
 
 /** Width of an opponent's plate, and of the box the geometry positions. */
-export const SEAT_WIDTH = 96;
+export const SEAT_WIDTH = 94;
 
 /** Height of that box: cards peeking over the plate, plus the plate. */
-export const SEAT_HEIGHT = 68;
+export const SEAT_HEIGHT = 60;
 
 /** The hero's plate is wider — it carries a name, a stack and a hand caption. */
 export const HERO_SEAT_WIDTH = 128;
