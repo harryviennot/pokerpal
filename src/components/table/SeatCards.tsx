@@ -44,7 +44,7 @@ export function SeatCards({
   const size: PlayingCardSize = hero ? 'xl' : faceUp ? 'medium' : 'small';
 
   return (
-    <View style={styles.hand}>
+    <View style={[styles.hand, hero && styles.heroDrop]}>
       {cards.map((card, index) => (
         <Animated.View key={card} style={hero ? lift[index === 0 ? 'first' : 'second'] : null}>
           <View style={fan(hero, index)}>
@@ -118,6 +118,11 @@ const styles = StyleSheet.create({
   hand: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+  },
+  // The hero's fan sits deeper behind the plate than the row would put it. A
+  // transform rather than a margin, so nothing else in the seat moves.
+  heroDrop: {
+    transform: [{ translateY: 12 }],
   },
   // Holds the plate down to the same place when a seat has no cards, so folding
   // does not make the whole seat jump.
