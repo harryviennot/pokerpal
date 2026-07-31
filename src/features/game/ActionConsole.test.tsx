@@ -336,7 +336,7 @@ describe('ActionConsole while somebody else is on the clock', () => {
 
     expect(spies.onPreselect).toHaveBeenCalledWith('check');
 
-    await user.press(screen.getByLabelText('Fold'));
+    await user.press(screen.getByLabelText('Check/Fold'));
 
     expect(spies.onPreselect).toHaveBeenCalledWith('checkFold');
   });
@@ -409,6 +409,7 @@ describe('ActionConsole while somebody else is on the clock', () => {
     );
 
     expect(screen.queryByLabelText('Check')).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText('Check/Fold')).not.toBeOnTheScreen();
     expect(screen.queryByLabelText('Fold')).not.toBeOnTheScreen();
   });
 });

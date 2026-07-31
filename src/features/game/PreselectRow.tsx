@@ -26,9 +26,7 @@ export interface PreselectRowProps {
  * knows, which would give away a bet still being dealt.
  *
  * The buttons keep the committing row's geography: fold in the left third, the
- * passive action in the middle, the raise third empty. The fold button reads
- * "Fold" even while a check is still free — arming it never folds a hand that
- * could check, which `resolvePreselect` guarantees.
+ * passive action in the middle, the raise third empty.
  *
  * Tapping an armed button disarms it: there is no third control for cancelling.
  */
@@ -46,7 +44,7 @@ export function PreselectRow({
     <View style={styles.row}>
       <View style={styles.slot}>
         <ConsoleButton
-          headline="Fold"
+          headline={facingBet ? 'Fold' : 'Check/Fold'}
           tone={tone(preselect === 'checkFold')}
           onPress={arm('checkFold')}
           style={styles.button}
