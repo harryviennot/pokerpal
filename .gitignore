@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# raw screen recordings (commit a compressed .mp4 instead — GitHub caps files at 100 MB)
+*.mov
