@@ -9,10 +9,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.harryviennot.pokerpal"
+      "bundleIdentifier": "com.harryviennot.pokerpal",
+      "infoPlist": {
+        "NSCameraUsageDescription": "PokerPal uses the camera to read the board cards in front of you during LivePlay."
+      }
     },
     "android": {
       "package": "com.harryviennot.pokerpal",
+      "permissions": ["android.permission.CAMERA"],
       "adaptiveIcon": {
         "backgroundColor": "#0B6B3A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -38,7 +42,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      ["react-native-fast-tflite", { "enableCoreMLDelegate": true }]
     ],
     "experiments": {
       "typedRoutes": true,

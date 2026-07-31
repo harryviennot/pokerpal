@@ -10,10 +10,10 @@ import { spacing } from '@/theme';
 
 import { AdviceHud } from './AdviceHud';
 import { BoardStrip } from './BoardStrip';
-import { DemoFeedPanel } from './DemoFeedPanel';
 import { EquityReadout } from './EquityReadout';
 import { DEFAULT_FUSION } from './fusion';
 import { adviceReview } from './liveAdvice';
+import { LiveCameraView } from './LiveCameraView';
 import { LiveTopBar } from './LiveTopBar';
 import { PotEntryPanel } from './PotEntryPanel';
 import { useLiveAdvice } from './useLiveAdvice';
@@ -84,7 +84,7 @@ export function LiveWatchScreen() {
         onEndHand={endHand}
       />
 
-      <DemoFeedPanel />
+      <LiveCameraView />
 
       <View style={styles.readouts}>
         <BoardStrip

@@ -9,6 +9,20 @@ import { LivePlayScreen } from './LivePlayScreen';
 import { ETHICS_SETTING_KEY } from './useEthicsAcknowledgement';
 import { useLivePlayStore } from './useLivePlayStore';
 
+// The camera view's focus effect needs a navigator; under Jest "focused once"
+// is an effect, same as the history screen's mock.
+jest.mock('expo-router', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const react = require('react') as { useEffect: (run: () => void, deps: unknown[]) => void };
+
+  return {
+    router: { push: jest.fn() },
+    useFocusEffect: (callback: () => void) => {
+      react.useEffect(callback, [callback]);
+    },
+  };
+});
+
 const FLOP = parseCards('Qc 7d 2s');
 
 const read = () => useLivePlayStore.getState();

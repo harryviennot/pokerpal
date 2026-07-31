@@ -31,6 +31,25 @@ jest.mock('react-native-reanimated', () => {
   return { __esModule: true, ...actual, default: actual.default, useReducedMotion: () => true };
 });
 
+// The camera and TFLite are native modules with no Jest implementation. The
+// mocks keep the LivePlay tree mountable: no permission, no model — which is
+// exactly the path the screen falls back from, so tests exercise the real
+// fallback rather than a pretend camera.
+jest.mock('react-native-vision-camera', () => ({
+  Camera: () => null,
+  useCameraPermission: () => ({
+    hasPermission: false,
+    requestPermission: jest.fn().mockResolvedValue(false),
+  }),
+  useFrameOutput: () => ({}),
+}));
+
+jest.mock('react-native-fast-tflite', () => ({
+  loadTensorflowModel: jest
+    .fn()
+    .mockRejectedValue(new Error('No TFLite runtime under Jest; LivePlay falls back to demo.')),
+}));
+
 // `Screen` asks for the safe area insets, which throws without a provider above
 // it. The library ships this mock for exactly that; wrapping every screen test
 // in a provider would be the same insets with more ceremony.
