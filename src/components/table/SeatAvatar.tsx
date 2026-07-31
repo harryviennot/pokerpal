@@ -5,10 +5,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { radius } from '@/theme';
 
 /** Diameter of the initial circle, which is what a caller with no artwork gets. */
-const AVATAR_SIZE = 34;
+const AVATAR_SIZE = 50;
 
 /** The character bust beside an opponent's plate. */
-const BUST = { width: 54, height: 76 };
+const BUST = { width: 75, height: 100 };
 
 /** The player's own portrait, which the reference plants in the bottom corner. */
 const HERO_BUST = { width: 152, height: 210 };

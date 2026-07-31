@@ -11,16 +11,16 @@ import { type ImageSourcePropType } from 'react-native';
 import { type Rng } from '@/engine';
 
 export const AVATARS: readonly ImageSourcePropType[] = [
-  require<ImageSourcePropType>('@/assets/avatars/avatar1.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar2.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar3.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar4.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar5.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar6.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar7.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar8.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar9.webp'),
-  require<ImageSourcePropType>('@/assets/avatars/avatar10.webp'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar1.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar2.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar3.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar4.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar5.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar6.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar7.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar8.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar9.png'),
+  require<ImageSourcePropType>('@/assets/avatars/avatar10.png'),
 ];
 
 /**
