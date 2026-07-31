@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   portrait: {
     position: 'absolute',
-    left: -spacing.xxl,
-    bottom: 0,
+    left: -spacing.xl,
+    bottom: -55,
   },
 });

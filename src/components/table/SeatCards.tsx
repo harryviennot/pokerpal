@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.md,
     transform: [{ rotate: '5deg' }],
     // Left-cast shadow so the top card reads as sitting above the one it overlaps.
-    boxShadow: '-6px 0 10px rgba(0, 0, 0, 0.35)',
+    boxShadow: '-3px 0 15px rgba(0, 0, 0, 0.2)',
     borderRadius: radius.xs,
   },
   backFirst: {
