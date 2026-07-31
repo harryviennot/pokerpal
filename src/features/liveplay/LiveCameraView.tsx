@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
-import { Camera, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
@@ -15,11 +15,13 @@ import { useLivePlayStore } from './useLivePlayStore';
 /**
  * The stage: the live camera feeding the detector, active only while this
  * screen is focused and the app is foregrounded so the sensor is never held
- * hostage. Falls back to the demo feed when the detector has no model, and to
- * a plain ask when the camera permission is missing.
+ * hostage. Falls back to the demo feed when there is no camera at all (a
+ * simulator) or the detector has no model, and to a plain ask when the camera
+ * permission is missing.
  */
 export function LiveCameraView() {
   const { colors } = useTheme();
+  const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
   const [focused, setFocused] = useState(false);
   const [appActive, setAppActive] = useState(true);
@@ -51,6 +53,12 @@ export function LiveCameraView() {
     setDenied(!granted);
   };
 
+  // Before the permission ask: with no camera to grant access to, asking is
+  // noise — the demo feed is the whole experience on a simulator.
+  if (device == null || status === 'unavailable') {
+    return <DemoFeedPanel />;
+  }
+
   if (!hasPermission) {
     return (
       <View style={[styles.stage, styles.centered, { backgroundColor: colors.felt }]}>
@@ -64,15 +72,11 @@ export function LiveCameraView() {
     );
   }
 
-  if (status === 'unavailable') {
-    return <DemoFeedPanel />;
-  }
-
   return (
     <View style={styles.stage}>
       <Camera
         style={styles.camera}
-        device="back"
+        device={device}
         isActive={focused && appActive}
         outputs={[frameOutput]}
       />

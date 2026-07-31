@@ -38,6 +38,7 @@ jest.mock('react-native-reanimated', () => {
 // its Skia template renderer returns null under Jest by design.
 jest.mock('react-native-vision-camera', () => ({
   Camera: () => null,
+  useCameraDevice: () => undefined,
   useCameraPermission: () => ({
     hasPermission: false,
     requestPermission: jest.fn().mockResolvedValue(false),
