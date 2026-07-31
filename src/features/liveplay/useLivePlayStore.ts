@@ -38,6 +38,8 @@ interface LivePlayState {
   handsObserved: number;
   /** Set when a hand boundary fires; the screen archives and starts the next. */
   handEnded: boolean;
+  /** Whether observed hands are reaching the history store. */
+  saveStatus: 'ok' | 'error';
 
   setHeroCards: (cards: readonly [Card, Card] | null) => void;
   setOpponents: (count: number) => void;
@@ -66,6 +68,7 @@ const initialState = {
   reviews: [] as readonly DecisionReview[],
   handsObserved: 0,
   handEnded: false,
+  saveStatus: 'ok' as const,
 };
 
 export const useLivePlayStore = create<LivePlayState>((set, get) => ({

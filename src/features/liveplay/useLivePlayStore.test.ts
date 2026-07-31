@@ -1,5 +1,5 @@
 import { parseCard, parseCards } from '@/engine';
-import { emptyFrames, frameOf, steadyFrames, type DetectionScript } from '@/services/vision';
+import { emptyFrames, steadyFrames, type DetectionScript } from '@/services/vision';
 
 import { DEFAULT_FUSION } from './fusion';
 import { liveUsedCards, useLivePlayStore } from './useLivePlayStore';
