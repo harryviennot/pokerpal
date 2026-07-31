@@ -6,6 +6,107 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-31 — The guide: coaching that arrives before the decision, in words you already know
+
+Two complaints, one cause. Learning mode told you your equity and left you to
+it — the coach's opinion only ever arrived after the hand, as a grade. And when
+it arrived it spoke a language nobody had taught: *"Blunder. Called 40% of pot
+with 18% equity and no draw, needing 25%."*
+
+The engine had the answer all along. `DecisionReview.best` is literally "the
+action the coach would have taken", bet size included, and no component had ever
+rendered it.
+
+Three slices, one per commit:
+
+1. **`src/engine/recommend.ts`.** The ranking `reviewDecision` did internally,
+   pulled out so it can run *before* a decision as well as after one. `coach.ts`
+   now only grades. Both files came in under the 400-line cap as a side effect.
+2. **The guide.** A toggle inside Learning — not a third mode, because training
+   wheels you cannot remove mid-session are not training wheels. On the hero's
+   turn the console names the move, loads the coach's size into the sizer, rings
+   the button, and explains itself.
+3. **Two registers and a glossary.** Every verdict is sayable in plain English or
+   in poker terms, the player switches between them, and the choice is
+   remembered. 33 glossary terms, each carrying both of its names.
+
+| File | What |
+| --- | --- |
+| `src/engine/recommend.ts` | `Recommendation`, `rankLines`, `recommend`, `opponentSpecs`, `factsFrom`, `lineValue`; `DecisionFacts` moved here |
+| `src/engine/coach.ts` | grading only, on top of `recommend` |
+| `src/features/game/useGuidedAdvice.ts`, `GuideCard.tsx` | the live recommendation and the card that says it |
+| `src/features/game/{types,tableSetup,useGameStore}.ts` | `guided` state, `setGuided`, forced off in real mode |
+| `src/features/game/{ActionConsole,ActionRow,ConsoleButton,TopBar,ModeChoice,TableSetupForm,GameScreen}.tsx` | the ring, the pre-loaded size, the felt toggle, the lobby switch |
+| `src/components/coach/{explain,glossary}.ts` | both registers, and the vocabulary |
+| `src/components/coach/{coachCopy,DecisionRow,DecisionExplanation,LeakSummary,GlossaryLink,GlossaryFooter,LanguageToggle,LanguageHeaderButton}` | the copy layer every review surface renders through |
+| `src/services/preferences/`, `src/hooks/useCoachLanguage.ts` | remembering the register |
+| `src/features/learn/`, `app/glossary.tsx` | the glossary sheet — first files in the `learn` pillar |
+
+No new dependencies. `expo-sqlite/kv-store` and `@expo/ui` were both already
+installed.
+
+### Decisions worth knowing about
+
+**One ranking, two moments.** The guide and the grade come from the same
+`rankLines` call. This is not tidiness — a guide that recommends a call and a
+coach that then marks the call down would be two coaches disagreeing in front of
+the player, and the product's whole claim is that the feedback is trustworthy.
+`recommend.test.ts` asserts the grade of the recommended line is `correct`, and
+`useGuidedAdvice.test.ts` asserts the live hook measures the lines the grader
+measures.
+
+**The refactor had to move no verdicts.** `recommend` draws from its `Rng` in
+exactly the sequence `reviewDecision` did — one `simulateEquity` call, same
+specs, same iteration count. `coach.test.ts` and `grading.test.ts` passing
+*unchanged* is the proof, and is the thing to re-check if that file is ever
+touched again.
+
+**The guide reads ranges; the equity badge does not.** `useLiveEquity`
+deliberately measures against random hands so its number is one the player could
+work out themselves. The guide uses `modelOpponents`, because inferring a range
+from public betting is the skill being taught and a guide that ignored the
+table's betting would advise worse than a competent opponent plays. Nothing
+leaks: `rangeModel` walks the public event log only.
+
+**Both registers ship.** Deleting the poker words was the tempting move and the
+wrong one — they are what you hear at a real table. So the glossary's job is the
+*mapping* between the two, and every entry carries both names. The two registers
+must quote the same figures; `explain.test.ts` walks every grade × habit ×
+action × street to prove neither invents one.
+
+**The model is passive, and the copy admits it.** `valueBetEv` credits a bet with
+no fold equity, so the coach prefers calling with aces preflop to raising with
+them. That is pinned by a test rather than wished away, and the card says "what
+the math likes here", never "the right move". First thing to revisit when a
+multi-street EV model exists.
+
+**The sizer belongs to the player.** The coach's size is an *opening* value only.
+Once the player moves the sizer, their number wins — including on the render
+where late advice arrives. A guide that dragged the slider back under a thumb
+would be worse than no guide.
+
+### Traps
+
+- **`expo-env.d.ts` is gitignored and not generated by `npm install`.** Without
+  it `require<T>()` fails to typecheck in `avatars.ts` and `TableFelt.tsx` —
+  eleven errors in files you did not touch. Write it by hand
+  (`/// <reference types="expo/types" />`) before believing a typecheck failure.
+- **`expo-sqlite/kv-store` loads under Jest but throws on access**
+  (`NativeDatabase is not a constructor`). `getPreferencesRepo` falls back to
+  memory and `kvRepo` swallows per-call failures, so a missing native module
+  costs a forgotten preference rather than a blank screen.
+- **The language store is seeded once, at import.** `import` statements hoist, so
+  installing a memory repo "before" the import in `jest.setup.ts` does not work.
+  The store is reset in `beforeEach` instead.
+- **`act(() => …)` synchronously in a component test corrupts the act scope** for
+  every test after it in the file — they all fail to render, with no hint about
+  the cause. This repo's idiom is `await act(async () => …)` and `await
+  renderHook(...)`; follow it.
+- **`main` was failing `prettier --check`** on trailing whitespace in
+  `CardFace.tsx`. Fixed in the first commit.
+
+---
+
 ## 2026-07-30 — The arena: a full-screen game above the tabs, bots that think, and two ways to play
 
 The game is no longer a tab with a header on top of it. It is a full-screen
