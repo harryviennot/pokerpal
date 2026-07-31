@@ -18,6 +18,7 @@ import { useGameStore } from './useGameStore';
 import { useLiveEquity } from './useLiveEquity';
 import { useRunoutEquity } from './useRunoutEquity';
 import { useShownFrame } from './useShownFrame';
+import { useStreetSettled } from './useStreetSettled';
 
 /**
  * The felt, full bleed: the screen the player actually looks at.
@@ -77,9 +78,12 @@ function Felt({ game }: { game: ActiveGame }) {
   const shown = frame?.snapshot ?? null;
   // White only while the table is genuinely waiting on a seat: the engine's
   // `toAct` is ahead of the frames while a burst of events is still revealing,
-  // and pointing at it mid-reveal would put the clock on the wrong seat.
+  // and pointing at it mid-reveal would put the clock on the wrong seat. A
+  // street that has just landed holds the clock a beat longer — the card
+  // first, then whose move it is.
   const caughtUp = game.shown >= hand.events.length;
-  const onClock = caughtUp && !hand.complete ? hand.toAct : null;
+  const streetSettled = useStreetSettled(frame?.event ?? null);
+  const onClock = caughtUp && !hand.complete && streetSettled ? hand.toAct : null;
 
   const runout = useRunoutEquity({ snapshot: shown, heroSeat });
   const live = useLiveEquity({ snapshot: shown, heroSeat, enabled: mode === 'learning' });

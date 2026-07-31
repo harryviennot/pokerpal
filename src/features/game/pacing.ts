@@ -17,6 +17,7 @@ import {
   type HandState,
   type Rng,
   type SeatIndex,
+  type Street,
 } from '@/engine';
 
 /**
@@ -99,6 +100,36 @@ export function nextHandDelayFor(events: readonly HandEvent[]): number {
  * arming a preselect still feels like skipping ahead.
  */
 export const PRESELECT_BEAT_MS = 400;
+
+/**
+ * The pause after a street lands, measured from the last card visibly landing,
+ * before anyone is shown on the clock. The table's grammar is first the card,
+ * then whose move it is — a plate that lights while a card is still turning
+ * muddles the two.
+ */
+const STREET_SETTLE_BASE_MS = 560;
+
+/**
+ * Board cards flip on `CardFlip`'s 70 ms stagger by board position, so each
+ * street's last card starts moving at a different time: the flop's third card
+ * at 140 ms, the turn's single card at 210, the river's at 280. The settle has
+ * to absorb that, or the clock gets a shorter breath every street.
+ */
+const CARD_STAGGER_MS = 70;
+
+/** Board index of the last card each street deals. Streets that deal none: -0. */
+const LAST_CARD_INDEX: Record<Street, number> = {
+  preflop: 0,
+  flop: 2,
+  turn: 3,
+  river: 4,
+  showdown: 0,
+};
+
+/** The full hold before the clock lights after `street` is dealt. */
+export function streetSettleFor(street: Street): number {
+  return STREET_SETTLE_BASE_MS + LAST_CARD_INDEX[street] * CARD_STAGGER_MS;
+}
 
 /** How long the hero has to act in real mode before the table acts for them. */
 export const DECISION_CLOCK_MS = 20_000;
