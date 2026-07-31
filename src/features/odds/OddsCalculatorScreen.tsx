@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { Pressable } from 'react-native';
 
+import { CardPicker } from '@/components/cards/CardPicker';
 import { Screen } from '@/components/ui/Screen';
 import { Section } from '@/components/ui/Section';
 import { Text } from '@/components/ui/Text';
 import { detectDraws } from '@/engine';
 
-import { CardPicker } from './CardPicker';
 import { CardSlots } from './CardSlots';
 import { EquityPanel } from './EquityPanel';
 import { OpponentsPanel } from './OpponentsPanel';
