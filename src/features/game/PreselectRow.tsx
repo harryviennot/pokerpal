@@ -21,9 +21,14 @@ export interface PreselectRowProps {
  *
  * Grey, because nothing here spends a chip yet, and only two choices, because a
  * third would be a decision rather than a shortcut. Which two depends on what
- * the player can *see* — a check-fold pair when the pot is unraised, a fold and
+ * the player can *see* — a fold and a check when the pot is unraised, a fold and
  * a call when there is money in front of them — never on what the engine already
  * knows, which would give away a bet still being dealt.
+ *
+ * The buttons keep the committing row's geography: fold in the left third, the
+ * passive action in the middle, the raise third empty. The fold button reads
+ * "Fold" even while a check is still free — arming it never folds a hand that
+ * could check, which `resolvePreselect` guarantees.
  *
  * Tapping an armed button disarms it: there is no third control for cancelling.
  */
@@ -39,14 +44,16 @@ export function PreselectRow({
 
   return (
     <View style={styles.row}>
-      {facingBet ? (
-        <>
-          <ConsoleButton
-            headline="Fold"
-            tone={tone(preselect === 'checkFold')}
-            onPress={arm('checkFold')}
-            style={styles.button}
-          />
+      <View style={styles.slot}>
+        <ConsoleButton
+          headline="Fold"
+          tone={tone(preselect === 'checkFold')}
+          onPress={arm('checkFold')}
+          style={styles.button}
+        />
+      </View>
+      <View style={styles.slot}>
+        {facingBet ? (
           <ConsoleButton
             headline="Call"
             // The reference says "All-in" rather than the number when a call is
@@ -56,23 +63,16 @@ export function PreselectRow({
             onPress={arm('callAny')}
             style={styles.button}
           />
-        </>
-      ) : (
-        <>
-          <ConsoleButton
-            headline="Check/Fold"
-            tone={tone(preselect === 'checkFold')}
-            onPress={arm('checkFold')}
-            style={styles.button}
-          />
+        ) : (
           <ConsoleButton
             headline="Check"
             tone={tone(preselect === 'check')}
             onPress={arm('check')}
             style={styles.button}
           />
-        </>
-      )}
+        )}
+      </View>
+      <View style={styles.slot} />
     </View>
   );
 }
@@ -82,8 +82,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  button: {
+  slot: {
     flex: 1,
+  },
+  button: {
     height: MIN_TOUCH_TARGET + spacing.sm,
   },
 });
