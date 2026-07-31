@@ -1,60 +1,52 @@
 /**
  * The camera-to-detections bridge: the only worklet code in the feature.
  *
- * Each frame arrives RGB at the model's input size (the camera pipeline does
- * the resize), runs through TFLite synchronously on the frame thread, decodes
- * to `FrameDetections`, and is posted to the React side — where a 10 Hz gate
- * keeps fusion fed at the rate its confirmation windows are tuned for.
+ * Each frame arrives RGB at the reader's working resolution (the camera
+ * pipeline does the scaling), runs through the screen reader synchronously on
+ * the frame thread, and is posted to the React side — where a 10 Hz gate keeps
+ * fusion fed at the rate its confirmation windows are tuned for.
  *
- * When the model cannot load (the checked-in file is a placeholder), the
- * status reads `unavailable` and the caller shows the demo feed instead.
+ * The glyph templates are rendered once at startup on the JS thread and
+ * captured by the worklet as plain typed arrays. When they cannot be rendered
+ * (no Skia), the status reads `unavailable` and the caller shows the demo feed.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrameOutput, type CameraFrameOutput } from 'react-native-vision-camera';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { decodeDetections, type FrameDetections } from '@/services/vision';
-import { loadCardModel, MODEL_INPUT_SIZE, type CardModel } from '@/services/vision/cardModel';
+import { readScreenFrame, type FrameDetections, type GlyphTemplates } from '@/services/vision';
+import { renderGlyphTemplates } from '@/services/vision/screenReader/renderTemplates';
 
-export type DetectorStatus = 'loading' | 'ready' | 'unavailable';
+export type DetectorStatus = 'ready' | 'unavailable';
 
 /** Fusion's confirmation windows are tuned for this cadence. */
 const POST_INTERVAL_MS = 100;
+
+/**
+ * Portrait working resolution. Wide enough that a board card lands ~35-45 px
+ * across and a rank glyph ~12-16 px — the floor for a reliable correlation
+ * after resampling — and no wider, because segmentation cost scales with it.
+ * A device-tuning constant: the first thing to move if frames are dropped.
+ */
+const PROCESS_WIDTH = 640;
+const PROCESS_HEIGHT = 1138;
 
 export function useCardFrameProcessor(post: (frame: FrameDetections) => void): {
   status: DetectorStatus;
   frameOutput: CameraFrameOutput;
 } {
-  const [card, setCard] = useState<CardModel | null>(null);
-  const [status, setStatus] = useState<DetectorStatus>('loading');
+  // Rendered once per mount, lazily: seventeen small glyphs, synchronous, and
+  // the worklet needs the result on the very first frame — so it is computed
+  // here rather than in an effect, which would spend a render on `null`.
+  const [templates] = useState<GlyphTemplates | null>(renderGlyphTemplates);
+  const status: DetectorStatus = templates ? 'ready' : 'unavailable';
   const lastPostAt = useRef(0);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    loadCardModel()
-      .then((loaded) => {
-        if (!cancelled) {
-          setCard(loaded);
-          setStatus('ready');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setStatus('unavailable');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // The receiving gate runs on the React side, where state is cheap; the
-  // worklet stays stateless. Stamped here too — the React clock is the one
-  // the gate compares against, and the frame's own timestamp unit is the
-  // camera pipeline's business. Inference between posts is bounded by
+  // worklet stays stateless. Stamped here too — the React clock is the one the
+  // gate compares against, and the frame's own timestamp unit is the camera
+  // pipeline's business. Work between posts is bounded by
   // `dropFramesWhileBusy` and tuned in the device pass, not here.
   const gatedPost = (cards: FrameDetections['cards']): void => {
     const now = Date.now();
@@ -67,29 +59,24 @@ export function useCardFrameProcessor(post: (frame: FrameDetections) => void): {
     post({ cards, timestampMs: now });
   };
 
-  const model = card?.model ?? null;
-  const layout = card?.layout ?? null;
+  // Pinned so the worklet closure captures one object for the mount's life
+  // rather than a fresh one every render.
+  const pinned = useMemo(() => templates, [templates]);
 
   const frameOutput = useFrameOutput({
-    targetResolution: { width: MODEL_INPUT_SIZE, height: MODEL_INPUT_SIZE },
+    targetResolution: { width: PROCESS_WIDTH, height: PROCESS_HEIGHT },
     pixelFormat: 'rgb',
     dropFramesWhileBusy: true,
     onFrame: (frame) => {
       'worklet';
 
       try {
-        if (model === null || layout === null || !frame.isValid) {
+        if (pinned === null || !frame.isValid) {
           return;
         }
 
-        const outputs = model.runSync([frame.getPixelBuffer()]);
-        const raw = outputs[0];
-
-        if (raw === undefined) {
-          return;
-        }
-
-        const detections = decodeDetections(new Float32Array(raw), layout);
+        const pixels = new Uint8Array(frame.getPixelBuffer());
+        const detections = readScreenFrame(pixels, frame.width, frame.height, pinned);
 
         scheduleOnRN(gatedPost, detections);
       } finally {

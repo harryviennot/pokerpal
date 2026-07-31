@@ -1,6 +1,6 @@
-import { parseCard, parseCards } from '@/engine';
+import { parseCard, parseCards, type Card } from '@/engine';
 import { getHandHistoryRepo } from '@/services/handHistory';
-import { emptyFrames, steadyFrames, type DetectionScript } from '@/services/vision';
+import { emptyFrames, heroPair, steadyFrames, type DetectionScript } from '@/services/vision';
 
 import { DEFAULT_FUSION } from './fusion';
 import { drainLiveArchive, liveUsedCards, useLivePlayStore } from './useLivePlayStore';
@@ -20,12 +20,14 @@ function ingest(script: DetectionScript): void {
   }
 }
 
-/** Into a watching hand with hero cards set — the everyday starting point. */
-function startWatching(): void {
-  const store = useLivePlayStore.getState();
+/** The hero's own pair, as the reader reports it: hero-zone, left then right. */
+function heroSighting(cards: readonly [Card, Card] = HERO) {
+  return [...heroPair(cards)];
+}
 
-  store.setHeroCards(HERO);
-  store.beginWatching();
+/** Hero cards on the table, entered the way the player would. */
+function startWatching(): void {
+  useLivePlayStore.getState().setHeroCards(HERO);
 }
 
 beforeEach(() => {
@@ -33,16 +35,45 @@ beforeEach(() => {
 });
 
 describe('useLivePlayStore', () => {
-  it('ignores frames until the user begins watching', () => {
+  it('reads the board with no setup step at all', () => {
     ingest(steadyFrames(FLOP, DEFAULT_FUSION.lockHits));
 
-    expect(useLivePlayStore.getState().fusion.board).toHaveLength(0);
+    expect(useLivePlayStore.getState().fusion.board).toEqual(FLOP);
   });
 
-  it('will not begin watching without hero cards', () => {
-    useLivePlayStore.getState().beginWatching();
+  it('adopts the hero pair the camera locks', () => {
+    ingest(steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits));
 
-    expect(useLivePlayStore.getState().phase).toBe('setup');
+    const state = useLivePlayStore.getState();
+
+    expect(state.heroCards).toEqual(HERO);
+    expect(state.heroSource).toBe('vision');
+  });
+
+  it('never overwrites a pair the player entered', () => {
+    const mine: readonly [Card, Card] = [parseCard('2c'), parseCard('3d')];
+
+    useLivePlayStore.getState().setHeroCards(mine);
+    ingest(steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits * 3));
+
+    const state = useLivePlayStore.getState();
+
+    expect(state.heroCards).toEqual(mine);
+    expect(state.heroSource).toBe('manual');
+  });
+
+  it('corrects one of the hero cards and kills the misread', () => {
+    ingest(steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits));
+
+    const corrected = parseCard('Js');
+
+    useLivePlayStore.getState().correctHeroCard(1, corrected);
+
+    const state = useLivePlayStore.getState();
+
+    expect(state.heroCards).toEqual([HERO[0], corrected]);
+    expect(state.heroSource).toBe('manual');
+    expect(state.rejected).toContain(HERO[1]);
   });
 
   it('locks a steady flop into the board', () => {
@@ -148,7 +179,7 @@ describe('useLivePlayStore', () => {
     expect(state.potEntry).toBeNull();
     expect(state.rejected).toHaveLength(0);
     expect(state.handEnded).toBe(false);
-    expect(state.phase).toBe('setup');
+    expect(state.heroSource).toBeNull();
     expect(state.handsObserved).toBe(1);
   });
 

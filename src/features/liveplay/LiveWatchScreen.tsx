@@ -12,10 +12,12 @@ import { AdviceHud } from './AdviceHud';
 import { BoardStrip } from './BoardStrip';
 import { EquityReadout } from './EquityReadout';
 import { DEFAULT_FUSION } from './fusion';
+import { HeroCardsRow } from './HeroCardsRow';
 import { adviceReview } from './liveAdvice';
 import { LiveCameraView } from './LiveCameraView';
 import { LiveTopBar } from './LiveTopBar';
 import { PotEntryPanel } from './PotEntryPanel';
+import { TableFactsRow } from './TableFactsRow';
 import { useLiveAdvice } from './useLiveAdvice';
 import { useLiveHud } from './useLiveHud';
 import { liveUsedCards, useLivePlayStore } from './useLivePlayStore';
@@ -27,6 +29,8 @@ import { liveUsedCards, useLivePlayStore } from './useLivePlayStore';
 export function LiveWatchScreen() {
   const candidates = useLivePlayStore((state) => state.fusion.candidates);
   const heroCards = useLivePlayStore((state) => state.heroCards);
+  const heroSource = useLivePlayStore((state) => state.heroSource);
+  const heroPending = useLivePlayStore((state) => state.fusion.hero.candidates.length);
   const fusion = useLivePlayStore((state) => state.fusion);
   const potEntry = useLivePlayStore((state) => state.potEntry);
   const opponents = useLivePlayStore((state) => state.opponents);
@@ -37,6 +41,8 @@ export function LiveWatchScreen() {
   const confirmCandidate = useLivePlayStore((state) => state.confirmCandidate);
   const rejectCandidate = useLivePlayStore((state) => state.rejectCandidate);
   const correctBoardCard = useLivePlayStore((state) => state.correctBoardCard);
+  const correctHeroCard = useLivePlayStore((state) => state.correctHeroCard);
+  const setHeroCards = useLivePlayStore((state) => state.setHeroCards);
   const setPotEntry = useLivePlayStore((state) => state.setPotEntry);
   const recordAdvice = useLivePlayStore((state) => state.recordAdvice);
   const endHand = useLivePlayStore((state) => state.endHand);
@@ -44,7 +50,12 @@ export function LiveWatchScreen() {
 
   const hud = useLiveHud();
   const advice = useLiveAdvice(hud.observation);
-  const [correcting, setCorrecting] = useState<number | null>(null);
+  // Which slot the player is fixing: a board index, or one of their own two.
+  const [correcting, setCorrecting] = useState<{ kind: 'board' | 'hero'; index: number } | null>(
+    null,
+  );
+  // The first of two manually entered hole cards, held until the pair is whole.
+  const [pendingHero, setPendingHero] = useState<Card | null>(null);
 
   // Every recommendation shown goes into the hand's record, so the archived
   // hand carries what the coach said at the time (PRD A4: session recording).
@@ -55,10 +66,30 @@ export function LiveWatchScreen() {
   }, [advice, recordAdvice]);
 
   const correct = (card: Card): void => {
-    if (correcting !== null) {
-      correctBoardCard(correcting, card);
-      setCorrecting(null);
+    if (correcting === null) {
+      return;
     }
+
+    if (correcting.kind === 'board') {
+      correctBoardCard(correcting.index, card);
+    } else if (heroCards) {
+      correctHeroCard(correcting.index === 0 ? 0 : 1, card);
+    } else {
+      // Nothing read yet: the first tap starts the pair, the second completes
+      // it. A half-entered hand is never written to the store.
+      const other = pendingHero;
+
+      if (other === null) {
+        setPendingHero(card);
+
+        return;
+      }
+
+      setHeroCards(correcting.index === 0 ? [card, other] : [other, card]);
+      setPendingHero(null);
+    }
+
+    setCorrecting(null);
   };
 
   if (handEnded) {
@@ -70,6 +101,7 @@ export function LiveWatchScreen() {
             The felt cleared, so this hand went to your history.
           </Text>
           <Button label="Next hand" onPress={startNextHand} />
+          <TableFactsRow />
         </View>
       </Screen>
     );
@@ -87,11 +119,18 @@ export function LiveWatchScreen() {
       <LiveCameraView />
 
       <View style={styles.readouts}>
+        <HeroCardsRow
+          cards={heroCards}
+          source={heroSource}
+          pending={heroPending}
+          onCorrect={(index) => setCorrecting({ kind: 'hero', index })}
+        />
+
         <BoardStrip
           board={hud.board}
           candidates={candidates}
           lockHits={DEFAULT_FUSION.lockHits}
-          onCorrect={setCorrecting}
+          onCorrect={(index) => setCorrecting({ kind: 'board', index })}
           onConfirm={confirmCandidate}
           onReject={rejectCandidate}
         />
@@ -99,7 +138,11 @@ export function LiveWatchScreen() {
         {correcting !== null ? (
           <View style={styles.correction}>
             <Text variant="subheadline" tone="secondaryLabel">
-              What is that card really?
+              {correcting.kind === 'hero' && heroCards === null
+                ? pendingHero === null
+                  ? 'Pick your first card.'
+                  : 'Pick your second card.'
+                : 'What is that card really?'}
             </Text>
             <CardPicker used={liveUsedCards({ heroCards, fusion })} onPick={correct} />
           </View>
@@ -114,6 +157,7 @@ export function LiveWatchScreen() {
             />
             <PotEntryPanel entry={potEntry} onCommit={setPotEntry} />
             <AdviceHud advice={advice} />
+            <TableFactsRow />
           </>
         )}
       </View>

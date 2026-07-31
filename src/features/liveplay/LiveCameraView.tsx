@@ -73,16 +73,9 @@ export function LiveCameraView() {
       <Camera
         style={styles.camera}
         device="back"
-        isActive={focused && appActive && status === 'ready'}
+        isActive={focused && appActive}
         outputs={[frameOutput]}
       />
-      {status === 'loading' ? (
-        <View style={[styles.overlay, styles.centered]}>
-          <Text variant="footnote" tone="secondaryLabel">
-            Loading the card detector…
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }

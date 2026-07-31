@@ -6,6 +6,100 @@ Newest entries at the top. Add one per meaningful chunk of work.
 
 ---
 
+## 2026-07-31 — LivePlay slice 2: the screen reader, and cards you never type in
+
+Slice 1 shipped the pipeline behind a placeholder `.tflite`, so on a real
+device LivePlay only ever showed its demo feed. That is fixed, and the fix
+changed what the feature *is*.
+
+**The scenario, stated plainly, because it decides everything below.** Two
+phones: one runs PokerPal's practice game, the other films it with LivePlay
+open. The overlay reads the table it is pointed at and shows the coach's
+recommendation. The camera is watching **our own renderer** — which means we
+know every pixel it will see, and a model is the wrong tool for a problem we
+have the source code to.
+
+So the ML path is gone: `react-native-fast-tflite`, its config plugin, the
+placeholder model, `metro.config.js`'s asset extension and the decode/classMap
+modules are all deleted. Git history keeps them for the physical-cards
+workstream the PRD still describes; nothing in the tree pretends to be a
+detector any more.
+
+**In their place, `src/services/vision/screenReader/` — classic CV, pure TS.**
+
+1. **Segmentation.** A whiteness mask on a stride-2 grid: bright *relative to
+   the frame's own 95th-percentile luma* (so exposure shifts don't matter) and
+   near-grey (so the blue felt, the red card backs and the purple mystery cards
+   never enter the mask — the between-hands interstitial reads as empty felt for
+   free, which is exactly what the boundary logic already wanted). Connected
+   components come from a run-length union-find over preallocated typed arrays.
+2. **Zoning by geometry, not by class.** The board is the largest aligned row of
+   card-shaped blobs in the middle band; the hero pair is the low central fan,
+   split at the column of least white coverage; everything else — opponent
+   showdowns near the felt edges, stray pills — is `other` and never read.
+3. **Reading a face.** Rank and suit come from two *fixed* sub-windows of the
+   card, tight-cropped to their ink, contrast-normalized, and cross-correlated
+   against templates. Suit shape decides; the pip's colour only breaks a
+   near-tie, because our four-colour deck shares a hue between ♠ and ♣ and both
+   ♥ and ♦ are warm.
+4. **Templates rendered at runtime** with the platform's own system font via an
+   offscreen Skia surface — the filmed screen draws SF Pro on iOS and Roboto on
+   Android, so shipping bitmaps would mean matching one platform's glyphs
+   against the other's.
+
+**Hero cards are read, not typed.** Fusion grew a second channel: hero
+candidates confirm on the same N-of-M rules, but lock as a **pair or not at
+all** (one confirmed card is half a hand, and half a hand cannot be graded) and
+go inert for the rest of the hand once locked. The store adopts that lock only
+when nothing is set, so a pair the player entered or corrected is never
+overwritten by a later frame. The setup gate is deleted; opening the tab is
+enough.
+
+Decisions and traps, the ones that cost time:
+
+- **The boundary clock now counts empty *board* frames, not empty frames.** The
+  hero's cards sit on screen for the entire hand; counting them would mean a
+  hand could never end. Zone-less detections still mean `board`, so all 19
+  original fusion tests passed untouched through the change.
+- **Cross-channel blocking is not optional.** A card locked on the board must
+  not audition as a hero card and vice versa — the same physical card cannot be
+  in two places, and without the shared blocked set a misread in one channel
+  poisons the other.
+- **A tight crop on one side must be a tight crop on the other.** The reader
+  crops what it extracts to the ink, so the templates have to be cropped the
+  same way, or the two are scaled from different extents and the correlation
+  collapses. This ate several rounds: the synthetic fixture's glyphs now force
+  their four corner blocks on precisely so the crop is stable, and their
+  interiors spell `index × 0x5B` rather than a hash — a 1-bit hash collision
+  reads as two glyphs that are a coin-flip apart.
+- **A glyph is not one band.** The first band-splitting attempt assumed rank and
+  pip were the top two runs of ink rows; both ♦ and ♥ pinch in the middle, and
+  a rank can break too. Fixed windows at fixed fractions of the card are what a
+  known renderer actually affords.
+- **The worklet declaration-order trap bit twice more** (`alignedRow`,
+  `meanInkColor`). Helpers above callers, always, in anything the frame worklet
+  can reach.
+- **`setState` in an effect is lint-banned** and was the wrong shape anyway: the
+  templates are needed on the very first frame, so they are computed in a lazy
+  `useState` initializer instead of a render spent on `null`.
+
+The test seam that made all of this tractable: `synthetic.ts` paints an RGB
+buffer — the exact input the worklet gets — stamping the same glyph bitmaps
+that `fakeTemplates()` matches against. `screenReaderPipeline.test.ts` then runs
+painted pixels through the reader, fusion, the store and the coach with nothing
+of ours mocked. 920 tests green.
+
+Standing gaps, honestly: **still no device pass** (CLAUDE.md PR rule 3), so the
+thresholds in `screenReader/config.ts` and the 640×1138 working resolution are
+reasoned, not measured, and perspective tolerance is untested against a real
+lens. The Skia template path has never executed — under Jest it returns null by
+design and the demo feed takes over. And if the filmed screen still shows the
+previous hand's cards when `startNextHand` fires, they can re-lock; the practice
+game's deal animation makes that unlikely and the correction UI covers it, but
+it is unproven.
+
+---
+
 ## 2026-07-31 — LivePlay slice 1: the camera pipeline, end to end, on a stand-in model
 
 Pillar A's Live Assist (PRD §A2/§A4) as a new `Live` tab: the camera watches a

@@ -3,9 +3,12 @@ import {
   emptyFrames,
   flicker,
   frameOf,
+  heroPair,
+  heroSlotBox,
   slotBox,
   steadyFrames,
   type DetectionScript,
+  type ScriptedCard,
 } from '@/services/vision';
 
 import {
@@ -212,8 +215,136 @@ describe('emptyFusion', () => {
     expect(emptyFusion()).toEqual({
       board: [] as Card[],
       candidates: [],
+      hero: { cards: null, candidates: [] },
       emptyStreak: 0,
       handEnded: false,
     });
+  });
+});
+
+describe('the hero channel', () => {
+  // Deliberately disjoint from the board fixtures above: a card cannot be in
+  // two places, and a collision would test the blocked set, not the channel.
+  const HERO: readonly [Card, Card] = [parseCard('Ad'), parseCard('Qc')];
+
+  /** The hero's pair as the reader reports it: hero-zone, left then right. */
+  function heroSighting(cards: readonly [Card, Card] = HERO): ScriptedCard[] {
+    return [...heroPair(cards)];
+  }
+
+  it('locks the pair together after six steady sightings', () => {
+    const early = play(emptyFusion(), steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits - 1));
+
+    expect(early.hero.cards).toBeNull();
+    expect(early.hero.candidates).toHaveLength(2);
+
+    const locked = fuseFrame(early, frameOf(heroSighting()));
+
+    expect(locked.hero.cards).toEqual(HERO);
+    expect(locked.hero.candidates).toHaveLength(0);
+  });
+
+  it('orders the pair left to right by where it saw them', () => {
+    // Listed right-to-left; the boxes say otherwise.
+    const swapped: ScriptedCard[] = [
+      { card: HERO[1], zone: 'hero', bbox: heroSlotBox(0) },
+      { card: HERO[0], zone: 'hero', bbox: heroSlotBox(1) },
+    ];
+
+    const state = play(emptyFusion(), steadyFrames(swapped, DEFAULT_FUSION.lockHits));
+
+    expect(state.hero.cards).toEqual([HERO[1], HERO[0]]);
+  });
+
+  it('never locks a single confirmed hero card alone', () => {
+    const lone: ScriptedCard[] = [{ card: HERO[0], zone: 'hero', bbox: heroSlotBox(0) }];
+    const state = play(emptyFusion(), steadyFrames(lone, DEFAULT_FUSION.lockHits * 3));
+
+    expect(state.hero.cards).toBeNull();
+    expect(state.hero.candidates).toHaveLength(1);
+  });
+
+  it('locks through a badge flickering over the pair', () => {
+    const state = play(emptyFusion(), flicker(heroSighting(), 4, 2, 1));
+    const after = play(state, steadyFrames(heroSighting(), 3));
+
+    expect(after.hero.cards).toEqual(HERO);
+  });
+
+  it('is inert once locked: the camera cannot change the pair', () => {
+    const locked = play(emptyFusion(), steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits));
+    const other: readonly [Card, Card] = [parseCard('2c'), parseCard('3d')];
+    const after = play(locked, steadyFrames(heroSighting(other), DEFAULT_FUSION.lockHits * 3));
+
+    expect(after.hero.cards).toEqual(HERO);
+  });
+
+  it('keeps the two channels apart: hero cards never join the board', () => {
+    const locked = play(emptyFusion(), steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits));
+    // The same two cards now misreported as board cards.
+    const asBoard = [
+      { card: HERO[0], bbox: slotBox(0) },
+      { card: HERO[1], bbox: slotBox(1) },
+    ];
+    const after = play(locked, steadyFrames(asBoard, DEFAULT_FUSION.lockHits * 2));
+
+    expect(after.board).toHaveLength(0);
+    expect(after.candidates).toHaveLength(0);
+  });
+
+  it('keeps a board card from auditioning as a hero card', () => {
+    const withFlop = play(
+      emptyFusion(),
+      steadyFrames([KC, SEVEN_H, TWO_D], DEFAULT_FUSION.lockHits),
+    );
+    const asHero: ScriptedCard[] = [{ card: KC, zone: 'hero', bbox: heroSlotBox(0) }];
+    const after = play(withFlop, steadyFrames(asHero, DEFAULT_FUSION.lockHits * 2));
+
+    expect(after.hero.candidates).toHaveLength(0);
+    expect(after.hero.cards).toBeNull();
+  });
+
+  it('ignores other-zone sightings entirely', () => {
+    const opponents: ScriptedCard[] = [
+      { card: parseCard('5c'), zone: 'other', bbox: slotBox(0) },
+      { card: parseCard('5d'), zone: 'other', bbox: slotBox(1) },
+    ];
+    const state = play(emptyFusion(), steadyFrames(opponents, DEFAULT_FUSION.lockHits * 2));
+
+    expect(state.board).toHaveLength(0);
+    expect(state.candidates).toHaveLength(0);
+    expect(state.hero.cards).toBeNull();
+    // An opponent's cards on screen are not a live board: the clock still runs.
+    expect(state.emptyStreak).toBeGreaterThan(0);
+  });
+
+  it('lets the hand end while the hero pair is still on screen', () => {
+    const locked = play(
+      { ...emptyFusion(), board: [KC, SEVEN_H, TWO_D] },
+      steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits),
+    );
+
+    expect(locked.hero.cards).toEqual(HERO);
+
+    // The board clears; the hero's cards stay visible the whole time.
+    const after = play(locked, steadyFrames(heroSighting(), DEFAULT_FUSION.handEndFrames));
+
+    expect(after.handEnded).toBe(true);
+  });
+
+  it('locks a fresh pair on the next hand', () => {
+    const locked = play(emptyFusion(), steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits));
+    const next: readonly [Card, Card] = [parseCard('7s'), parseCard('8s')];
+    const after = play(emptyFusion(), steadyFrames(heroSighting(next), DEFAULT_FUSION.lockHits));
+
+    expect(locked.hero.cards).toEqual(HERO);
+    expect(after.hero.cards).toEqual(next);
+  });
+
+  it('keeps the hero track reference stable across idle frames', () => {
+    const locked = play(emptyFusion(), steadyFrames(heroSighting(), DEFAULT_FUSION.lockHits));
+    const after = play(locked, emptyFrames(3));
+
+    expect(after.hero).toBe(locked.hero);
   });
 });
