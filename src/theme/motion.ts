@@ -35,9 +35,9 @@ export const springs = {
   /**
    * A seat plate crossfading between states. Critically damped, because a
    * colour that overshoots reads as a flash of some third state; settles in
-   * about 200 ms — quick enough to track a fast orbit of the table.
+   * about 150 ms — the floor before the fade stops reading as one.
    */
-  tone: { damping: 56, stiffness: 780, mass: 1 },
+  tone: { damping: 76, stiffness: 1450, mass: 1 },
 } as const satisfies Record<string, SpringPreset>;
 
 export type SpringName = keyof typeof springs;
